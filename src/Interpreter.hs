@@ -40,16 +40,15 @@ transConstructor name [] values = Variant name values
 transConstructor name (arg:rest) values =
   Func (\v -> Ok $ transConstructor name rest (values ++ [v]))
 
-transDecl :: Env -> Decl -> Err Env
-transDecl env (DValue (ValueIdent name) argsIdents exp) =
+transDecl evalEnv envStub (DValue (ValueIdent name) argsIdents exp) =
   let composeLambdas argIdent partialExp = ELambda argIdent partialExp in
   let func = Prelude.foldr composeLambdas exp argsIdents
   in do
-      rec val <- transExp (insert name val env) func
-      return $ insert name val env
+      val <- transExp evalEnv func
+      return $ insert name val envStub
 
-transDecl env (DData declIgnored variants) =
-  foldM go env variants where
+transDecl evalEnv envStub (DData declIgnored variants) =
+  foldM go envStub variants where
     go :: Env -> Variant -> Err Env
     go env' (Var (TypeIdent name) args) =
       Ok $ insert name (transConstructor name args []) env'
@@ -62,7 +61,7 @@ transExp env x = case x of
   EDiv exp1 exp2 -> Bad "integer division not implemented"
   EInt integer -> Ok $ Const $ integer
   EWhere exp decls -> do
-    env' <- foldM transDecl env decls
+    rec env' <- foldM (transDecl env') env decls
     v1 <- transExp env' exp
     return v1
   ELet (ValueIdent str) exp1 exp2 -> do
