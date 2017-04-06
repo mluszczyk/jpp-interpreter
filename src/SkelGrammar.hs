@@ -27,5 +27,9 @@ transExp x = case x of
   EVar ident -> failure x
 transDecl :: Decl -> Result
 transDecl x = case x of
-  D ident idents exp -> failure x
+  DConst ident idents exp -> failure x
+  DData ident idents variants -> failure x
+transVariant :: Variant -> Result
+transVariant x = case x of
+  V ident idents -> failure x
 

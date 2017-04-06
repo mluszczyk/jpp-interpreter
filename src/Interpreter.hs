@@ -11,7 +11,8 @@ import AbsGrammar
 import ErrM
 type Result = Err Value
 
-data Value = Const Integer | Func (Value -> Result)
+data Value = Const Integer | Func (Value -> Result) |
+    VariantValue String [Value]
 
 instance Show Value where
   show (Const n) = "Const " ++ (show n)
@@ -33,12 +34,15 @@ instance MonadFix (Err) where
                    unRight (Bad _) = errorWithoutStackTrace "mfix Either: Left"
 
 transDecl :: Env -> Decl -> Err Env
-transDecl env (D (Ident name) argsIdents exp) =
+transDecl env (DConst (Ident name) argsIdents exp) =
   let composeLambdas argIdent partialExp = ELambda argIdent partialExp in
   let func = Prelude.foldr composeLambdas exp argsIdents
   in do
       rec val <- transExp (insert name val env) func
       return $ insert name val env
+
+transDecl env (DData (Ident name) argsIdents exp) =
+  Ok env
 
 transExp :: Env -> Exp -> Result
 transExp env x = case x of

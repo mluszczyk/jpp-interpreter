@@ -100,8 +100,15 @@ instance Print Exp where
 
 instance Print Decl where
   prt i e = case e of
-    D id ids exp -> prPrec i 0 (concatD [prt 0 id, prt 0 ids, doc (showString "="), prt 0 exp])
+    DConst id ids exp -> prPrec i 0 (concatD [prt 0 id, prt 0 ids, doc (showString "="), prt 0 exp])
+    DData id ids variants -> prPrec i 0 (concatD [doc (showString "data"), prt 0 id, prt 0 ids, doc (showString "="), prt 0 variants])
   prtList _ [] = (concatD [])
   prtList _ [x] = (concatD [prt 0 x])
   prtList _ (x:xs) = (concatD [prt 0 x, doc (showString ";"), prt 0 xs])
+instance Print Variant where
+  prt i e = case e of
+    V id ids -> prPrec i 0 (concatD [prt 0 id, prt 0 ids])
+  prtList _ [] = (concatD [])
+  prtList _ [x] = (concatD [prt 0 x])
+  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString "|"), prt 0 xs])
 

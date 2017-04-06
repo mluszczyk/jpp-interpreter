@@ -11,6 +11,12 @@ EInt.	Exp2	::=	Integer	;
 EVar. Exp2 ::= Ident ;
 coercions	Exp	2	;
 
-D. Decl ::= Ident [Ident] "=" Exp ;
-separator Ident ""; 
-separator Decl ";"
+DConst. Decl ::= Ident [Ident] "=" Exp ;
+DData. Decl ::= "data" Ident [Ident] "=" [Variant] ;
+
+V. Variant ::= Ident [Ident] ;
+
+separator Ident "" ; 
+separator Decl ";" ;
+separator Variant "|" ;
+

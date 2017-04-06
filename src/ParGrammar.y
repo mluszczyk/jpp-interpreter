@@ -12,8 +12,10 @@ import ErrM
 %name pExp1 Exp1
 %name pExp2 Exp2
 %name pDecl Decl
+%name pVariant Variant
 %name pListIdent ListIdent
 %name pListDecl ListDecl
+%name pListVariant ListVariant
 -- no lexer declaration
 %monad { Err } { thenM } { returnM }
 %tokentype {Token}
@@ -28,14 +30,16 @@ import ErrM
   ';' { PT _ (TS _ 8) }
   '=' { PT _ (TS _ 9) }
   '\\' { PT _ (TS _ 10) }
-  'else' { PT _ (TS _ 11) }
-  'if' { PT _ (TS _ 12) }
-  'in' { PT _ (TS _ 13) }
-  'let' { PT _ (TS _ 14) }
-  'then' { PT _ (TS _ 15) }
-  'where' { PT _ (TS _ 16) }
-  '{' { PT _ (TS _ 17) }
-  '}' { PT _ (TS _ 18) }
+  'data' { PT _ (TS _ 11) }
+  'else' { PT _ (TS _ 12) }
+  'if' { PT _ (TS _ 13) }
+  'in' { PT _ (TS _ 14) }
+  'let' { PT _ (TS _ 15) }
+  'then' { PT _ (TS _ 16) }
+  'where' { PT _ (TS _ 17) }
+  '{' { PT _ (TS _ 18) }
+  '|' { PT _ (TS _ 19) }
+  '}' { PT _ (TS _ 20) }
 
 L_ident  { PT _ (TV $$) }
 L_integ  { PT _ (TI $$) }
@@ -64,13 +68,20 @@ Exp2 : Integer { AbsGrammar.EInt $1 }
      | Ident { AbsGrammar.EVar $1 }
      | '(' Exp ')' { $2 }
 Decl :: { Decl }
-Decl : Ident ListIdent '=' Exp { AbsGrammar.D $1 $2 $4 }
+Decl : Ident ListIdent '=' Exp { AbsGrammar.DConst $1 $2 $4 }
+     | 'data' Ident ListIdent '=' ListVariant { AbsGrammar.DData $2 $3 $5 }
+Variant :: { Variant }
+Variant : Ident ListIdent { AbsGrammar.V $1 $2 }
 ListIdent :: { [Ident] }
 ListIdent : {- empty -} { [] } | Ident ListIdent { (:) $1 $2 }
 ListDecl :: { [Decl] }
 ListDecl : {- empty -} { [] }
          | Decl { (:[]) $1 }
          | Decl ';' ListDecl { (:) $1 $3 }
+ListVariant :: { [Variant] }
+ListVariant : {- empty -} { [] }
+            | Variant { (:[]) $1 }
+            | Variant '|' ListVariant { (:) $1 $3 }
 {
 
 returnM :: a -> Err a
