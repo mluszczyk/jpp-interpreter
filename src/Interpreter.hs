@@ -1,8 +1,11 @@
+{-# LANGUAGE RecursiveDo #-}
+
 module Interpreter where
 
 import Debug.Trace
 
 import Control.Monad
+import Control.Monad.Fix
 import Data.Map as M
 import AbsGrammar
 import ErrM
@@ -24,13 +27,18 @@ arithm op env exp1 exp2 = do
     (Const i1, Const i2) -> Ok $ Const (i1 `op` i2)
     _ -> Bad $ "arithmetic operations only supported for consts"
 
+instance MonadFix (Err) where
+    mfix f = let a = f (unRight a) in a
+             where unRight (Ok x) = x
+                   unRight (Bad _) = errorWithoutStackTrace "mfix Either: Left"
+
 transDecl :: Env -> Decl -> Err Env
-transDecl env (D (Ident name) argsIdents exp) = do
-  let composeLambdas argIdent partialExp = ELambda argIdent partialExp
+transDecl env (D (Ident name) argsIdents exp) =
+  let composeLambdas argIdent partialExp = ELambda argIdent partialExp in
   let func = Prelude.foldr composeLambdas exp argsIdents
-  val <- transExp env func
-  let env' = insert name val env
-  return env'
+  in do
+      rec val <- transExp (insert name val env) func
+      return $ insert name val env
 
 transExp :: Env -> Exp -> Result
 transExp env x = case x of
