@@ -52,7 +52,7 @@ transExp env x = case x of
     v1 <- transExp env' exp
     return v1
   ELet (Ident str) exp1 exp2 -> do
-    v1 <- transExp env exp1
+    rec v1 <- transExp (insert str v1 env) exp1
     let env' = insert str v1 env
     v2 <- transExp env' exp2
     return v2
