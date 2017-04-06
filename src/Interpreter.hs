@@ -1,5 +1,7 @@
 module Interpreter where
 
+import Debug.Trace
+
 import Control.Monad
 import Data.Map as M
 import AbsGrammar
@@ -23,10 +25,12 @@ arithm op env exp1 exp2 = do
     _ -> Bad $ "arithmetic operations only supported for consts"
 
 transDecl :: Env -> Decl -> Err Env
-transDecl env (D (Ident name) args exp) = do
-  -- val <- transExp env exp
-  let env = insert name (Const 3) env
-  return env
+transDecl env (D (Ident name) argsIdents exp) = do
+  let composeLambdas argIdent partialExp = ELambda argIdent partialExp
+  let func = Prelude.foldr composeLambdas exp argsIdents
+  val <- transExp env func
+  let env' = insert name val env
+  return env'
 
 transExp :: Env -> Exp -> Result
 transExp env x = case x of
