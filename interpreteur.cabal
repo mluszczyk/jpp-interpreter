@@ -22,9 +22,11 @@ library
                        PrintGrammar
                        SkelGrammar
                        ErrM
+                       Interpreter
   build-depends:       base >= 4.7 && < 5
                      , BNFC
                      , array
+                     , containers
   default-language:    Haskell2010
 
 executable interpreteur-exe

@@ -7,11 +7,21 @@ module AbsGrammar where
 
 
 
+newtype Ident = Ident String deriving (Eq, Ord, Show, Read)
 data Exp
-    = EAdd Exp Exp
+    = EApp Exp Exp
+    | EIf Exp Exp Exp
+    | ELet Ident Exp Exp
+    | EWhere Exp [Decl]
+    | ELambda Ident Exp
+    | EAdd Exp Exp
     | ESub Exp Exp
     | EMul Exp Exp
     | EDiv Exp Exp
     | EInt Integer
+    | EVar Ident
+  deriving (Eq, Ord, Show, Read)
+
+data Decl = D Ident [Ident] Exp
   deriving (Eq, Ord, Show, Read)
 

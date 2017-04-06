@@ -11,6 +11,9 @@ import ErrM
 %name pExp Exp
 %name pExp1 Exp1
 %name pExp2 Exp2
+%name pDecl Decl
+%name pListIdent ListIdent
+%name pListDecl ListDecl
 -- no lexer declaration
 %monad { Err } { thenM } { returnM }
 %tokentype {Token}
@@ -20,17 +23,36 @@ import ErrM
   '*' { PT _ (TS _ 3) }
   '+' { PT _ (TS _ 4) }
   '-' { PT _ (TS _ 5) }
-  '/' { PT _ (TS _ 6) }
+  '->' { PT _ (TS _ 6) }
+  '/' { PT _ (TS _ 7) }
+  ';' { PT _ (TS _ 8) }
+  '=' { PT _ (TS _ 9) }
+  '\\' { PT _ (TS _ 10) }
+  'else' { PT _ (TS _ 11) }
+  'if' { PT _ (TS _ 12) }
+  'in' { PT _ (TS _ 13) }
+  'let' { PT _ (TS _ 14) }
+  'then' { PT _ (TS _ 15) }
+  'where' { PT _ (TS _ 16) }
+  '{' { PT _ (TS _ 17) }
+  '}' { PT _ (TS _ 18) }
 
+L_ident  { PT _ (TV $$) }
 L_integ  { PT _ (TI $$) }
 
 
 %%
 
+Ident   :: { Ident }   : L_ident  { Ident $1 }
 Integer :: { Integer } : L_integ  { (read ( $1)) :: Integer }
 
 Exp :: { Exp }
-Exp : Exp '+' Exp1 { AbsGrammar.EAdd $1 $3 }
+Exp : Exp Exp { AbsGrammar.EApp $1 $2 }
+    | 'if' Exp 'then' Exp 'else' Exp { AbsGrammar.EIf $2 $4 $6 }
+    | 'let' Ident '=' Exp 'in' Exp { AbsGrammar.ELet $2 $4 $6 }
+    | Exp 'where' '{' ListDecl '}' { AbsGrammar.EWhere $1 $4 }
+    | '\\' Ident '->' Exp { AbsGrammar.ELambda $2 $4 }
+    | Exp '+' Exp1 { AbsGrammar.EAdd $1 $3 }
     | Exp '-' Exp1 { AbsGrammar.ESub $1 $3 }
     | Exp1 { $1 }
 Exp1 :: { Exp }
@@ -38,7 +60,17 @@ Exp1 : Exp1 '*' Exp2 { AbsGrammar.EMul $1 $3 }
      | Exp1 '/' Exp2 { AbsGrammar.EDiv $1 $3 }
      | Exp2 { $1 }
 Exp2 :: { Exp }
-Exp2 : Integer { AbsGrammar.EInt $1 } | '(' Exp ')' { $2 }
+Exp2 : Integer { AbsGrammar.EInt $1 }
+     | Ident { AbsGrammar.EVar $1 }
+     | '(' Exp ')' { $2 }
+Decl :: { Decl }
+Decl : Ident ListIdent '=' Exp { AbsGrammar.D $1 $2 $4 }
+ListIdent :: { [Ident] }
+ListIdent : {- empty -} { [] } | Ident ListIdent { (:) $1 $2 }
+ListDecl :: { [Decl] }
+ListDecl : {- empty -} { [] }
+         | Decl { (:[]) $1 }
+         | Decl ';' ListDecl { (:) $1 $3 }
 {
 
 returnM :: a -> Err a

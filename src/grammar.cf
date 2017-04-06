@@ -1,7 +1,16 @@
+EApp. Exp ::= Exp Exp;
+EIf. Exp ::= "if" Exp "then" Exp "else" Exp ;
+ELet. Exp ::= "let" Ident "=" Exp "in" Exp ;
+EWhere. Exp ::= Exp "where" "{" [Decl] "}";
+ELambda. Exp ::= "\\" Ident "->" Exp ;
 EAdd.	Exp	::=	Exp	"+"	Exp1	;
 ESub.	Exp	::=	Exp	"-"	Exp1	;
 EMul.	Exp1	::=	Exp1	"*"	Exp2	;
 EDiv.	Exp1	::=	Exp1	"/"	Exp2	;
 EInt.	Exp2	::=	Integer	;
+EVar. Exp2 ::= Ident ;
 coercions	Exp	2	;
 
+D. Decl ::= Ident [Ident] "=" Exp ;
+separator Ident ""; 
+separator Decl ";"
