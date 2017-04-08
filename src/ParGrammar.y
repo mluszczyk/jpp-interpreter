@@ -11,8 +11,11 @@ import ErrM
 %name pExp Exp
 %name pExp1 Exp1
 %name pExp2 Exp2
-%name pDecl Decl
+%name pTypeDecl TypeDecl
+%name pTypeRef TypeRef
+%name pListTypeRef ListTypeRef
 %name pVariant Variant
+%name pDecl Decl
 %name pListIdent ListIdent
 %name pListDecl ListDecl
 %name pListVariant ListVariant
@@ -51,7 +54,7 @@ Ident   :: { Ident }   : L_ident  { Ident $1 }
 Integer :: { Integer } : L_integ  { (read ( $1)) :: Integer }
 
 Exp :: { Exp }
-Exp : Exp Exp { AbsGrammar.EApp $1 $2 }
+Exp : Exp Exp1 { AbsGrammar.EApp $1 $2 }
     | 'if' Exp 'then' Exp 'else' Exp { AbsGrammar.EIf $2 $4 $6 }
     | 'let' Ident '=' Exp 'in' Exp { AbsGrammar.ELet $2 $4 $6 }
     | Exp 'where' '{' ListDecl '}' { AbsGrammar.EWhere $1 $4 }
@@ -67,11 +70,21 @@ Exp2 :: { Exp }
 Exp2 : Integer { AbsGrammar.EInt $1 }
      | Ident { AbsGrammar.EVar $1 }
      | '(' Exp ')' { $2 }
+TypeDecl :: { TypeDecl }
+TypeDecl : Ident ListIdent { AbsGrammar.TDecl $1 $2 }
+TypeRef :: { TypeRef }
+TypeRef : Ident ListTypeRef { AbsGrammar.TRef $1 $2 }
+        | '(' TypeRef ')' { $2 }
+ListTypeRef :: { [TypeRef] }
+ListTypeRef : {- empty -} { [] }
+            | TypeRef ListTypeRef { (:) $1 $2 }
+            | {- empty -} { [] }
+            | TypeRef ListTypeRef { (:) $1 $2 }
+Variant :: { Variant }
+Variant : Ident ListTypeRef { AbsGrammar.Var $1 $2 }
 Decl :: { Decl }
 Decl : Ident ListIdent '=' Exp { AbsGrammar.DConst $1 $2 $4 }
-     | 'data' Ident ListIdent '=' ListVariant { AbsGrammar.DData $2 $3 $5 }
-Variant :: { Variant }
-Variant : Ident ListIdent { AbsGrammar.V $1 $2 }
+     | 'data' TypeDecl '=' ListVariant { AbsGrammar.DData $2 $4 }
 ListIdent :: { [Ident] }
 ListIdent : {- empty -} { [] } | Ident ListIdent { (:) $1 $2 }
 ListDecl :: { [Decl] }

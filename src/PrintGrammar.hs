@@ -86,7 +86,7 @@ instance Print Ident where
 
 instance Print Exp where
   prt i e = case e of
-    EApp exp1 exp2 -> prPrec i 0 (concatD [prt 0 exp1, prt 0 exp2])
+    EApp exp1 exp2 -> prPrec i 0 (concatD [prt 0 exp1, prt 1 exp2])
     EIf exp1 exp2 exp3 -> prPrec i 0 (concatD [doc (showString "if"), prt 0 exp1, doc (showString "then"), prt 0 exp2, doc (showString "else"), prt 0 exp3])
     ELet id exp1 exp2 -> prPrec i 0 (concatD [doc (showString "let"), prt 0 id, doc (showString "="), prt 0 exp1, doc (showString "in"), prt 0 exp2])
     EWhere exp decls -> prPrec i 0 (concatD [prt 0 exp, doc (showString "where"), doc (showString "{"), prt 0 decls, doc (showString "}")])
@@ -98,17 +98,28 @@ instance Print Exp where
     EInt n -> prPrec i 2 (concatD [prt 0 n])
     EVar id -> prPrec i 2 (concatD [prt 0 id])
 
-instance Print Decl where
+instance Print TypeDecl where
   prt i e = case e of
-    DConst id ids exp -> prPrec i 0 (concatD [prt 0 id, prt 0 ids, doc (showString "="), prt 0 exp])
-    DData id ids variants -> prPrec i 0 (concatD [doc (showString "data"), prt 0 id, prt 0 ids, doc (showString "="), prt 0 variants])
+    TDecl id ids -> prPrec i 0 (concatD [prt 0 id, prt 0 ids])
+
+instance Print TypeRef where
+  prt i e = case e of
+    TRef id typerefs -> prPrec i 0 (concatD [prt 0 id, prt 0 typerefs])
   prtList _ [] = (concatD [])
-  prtList _ [x] = (concatD [prt 0 x])
-  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString ";"), prt 0 xs])
+  prtList _ [] = (concatD [])
+  prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
+  prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
 instance Print Variant where
   prt i e = case e of
-    V id ids -> prPrec i 0 (concatD [prt 0 id, prt 0 ids])
+    Var id typerefs -> prPrec i 0 (concatD [prt 0 id, prt 0 typerefs])
   prtList _ [] = (concatD [])
   prtList _ [x] = (concatD [prt 0 x])
   prtList _ (x:xs) = (concatD [prt 0 x, doc (showString "|"), prt 0 xs])
+instance Print Decl where
+  prt i e = case e of
+    DConst id ids exp -> prPrec i 0 (concatD [prt 0 id, prt 0 ids, doc (showString "="), prt 0 exp])
+    DData typedecl variants -> prPrec i 0 (concatD [doc (showString "data"), prt 0 typedecl, doc (showString "="), prt 0 variants])
+  prtList _ [] = (concatD [])
+  prtList _ [x] = (concatD [prt 0 x])
+  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString ";"), prt 0 xs])
 

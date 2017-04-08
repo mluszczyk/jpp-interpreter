@@ -1,4 +1,4 @@
-EApp. Exp ::= Exp Exp;
+EApp. Exp ::= Exp Exp1;
 EIf. Exp ::= "if" Exp "then" Exp "else" Exp ;
 ELet. Exp ::= "let" Ident "=" Exp "in" Exp ;
 EWhere. Exp ::= Exp "where" "{" [Decl] "}";
@@ -11,10 +11,19 @@ EInt.	Exp2	::=	Integer	;
 EVar. Exp2 ::= Ident ;
 coercions	Exp	2	;
 
-DConst. Decl ::= Ident [Ident] "=" Exp ;
-DData. Decl ::= "data" Ident [Ident] "=" [Variant] ;
+TDecl. TypeDecl ::= Ident [Ident] ;
+-- e.g. `Blah a b c`
 
-V. Variant ::= Ident [Ident] ;
+TRef. TypeRef ::= Ident [TypeRef] ;
+_. TypeRef ::= "(" TypeRef ")" ;
+separator TypeRef "" ;
+-- e.g. `Blah (Blah a b c) [Blah] ;
+
+Var. Variant ::= Ident [TypeRef] ;
+separator TypeRef "" ;
+
+DConst. Decl ::= Ident [Ident] "=" Exp ;
+DData. Decl ::= "data" TypeDecl "=" [Variant] ;
 
 separator Ident "" ; 
 separator Decl ";" ;

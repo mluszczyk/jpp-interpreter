@@ -22,10 +22,15 @@ data Exp
     | EVar Ident
   deriving (Eq, Ord, Show, Read)
 
-data Decl
-    = DConst Ident [Ident] Exp | DData Ident [Ident] [Variant]
+data TypeDecl = TDecl Ident [Ident]
   deriving (Eq, Ord, Show, Read)
 
-data Variant = V Ident [Ident]
+data TypeRef = TRef Ident [TypeRef]
+  deriving (Eq, Ord, Show, Read)
+
+data Variant = Var Ident [TypeRef]
+  deriving (Eq, Ord, Show, Read)
+
+data Decl = DConst Ident [Ident] Exp | DData TypeDecl [Variant]
   deriving (Eq, Ord, Show, Read)
 

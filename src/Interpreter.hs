@@ -12,11 +12,12 @@ import ErrM
 type Result = Err Value
 
 data Value = Const Integer | Func (Value -> Result) |
-    VariantValue String [Value]
+    Variant String [Value]
 
 instance Show Value where
   show (Const n) = "Const " ++ (show n)
   show (Func f) = "Func"
+  show (Variant s d) = ("Variant " ++ s ++ (show d))
 
 type Env = M.Map String Value
 
@@ -33,6 +34,11 @@ instance MonadFix (Err) where
              where unRight (Ok x) = x
                    unRight (Bad _) = errorWithoutStackTrace "mfix Either: Left"
 
+transConstructor :: String -> [a] -> [Value] -> Value
+transConstructor name [] values = Variant name values
+transConstructor name (arg:rest) values =
+  Func (\v -> Ok $ transConstructor name rest (values ++ [v]))
+
 transDecl :: Env -> Decl -> Err Env
 transDecl env (DConst (Ident name) argsIdents exp) =
   let composeLambdas argIdent partialExp = ELambda argIdent partialExp in
@@ -41,8 +47,11 @@ transDecl env (DConst (Ident name) argsIdents exp) =
       rec val <- transExp (insert name val env) func
       return $ insert name val env
 
-transDecl env (DData (Ident name) argsIdents exp) =
-  Ok env
+transDecl env (DData declIgnored variants) =
+  foldM go env variants where
+    go :: Env -> Variant -> Err Env
+    go env' (Var (Ident name) args) =
+      Ok $ insert name (transConstructor name args []) env'
 
 transExp :: Env -> Exp -> Result
 transExp env x = case x of

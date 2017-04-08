@@ -25,11 +25,17 @@ transExp x = case x of
   EDiv exp1 exp2 -> failure x
   EInt integer -> failure x
   EVar ident -> failure x
+transTypeDecl :: TypeDecl -> Result
+transTypeDecl x = case x of
+  TDecl ident idents -> failure x
+transTypeRef :: TypeRef -> Result
+transTypeRef x = case x of
+  TRef ident typerefs -> failure x
+transVariant :: Variant -> Result
+transVariant x = case x of
+  Var ident typerefs -> failure x
 transDecl :: Decl -> Result
 transDecl x = case x of
   DConst ident idents exp -> failure x
-  DData ident idents variants -> failure x
-transVariant :: Variant -> Result
-transVariant x = case x of
-  V ident idents -> failure x
+  DData typedecl variants -> failure x
 
