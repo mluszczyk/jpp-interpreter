@@ -100,20 +100,34 @@ transExp env x = case x of
       _ -> Bad "cannot apply to a constant"
   ECase exp caseParts ->
     let 
-      matchPattern :: Value -> Pattern -> Maybe (Err Env)
-      matchPattern value PAny = Just (Ok env)
-      matchPattern value (PValue (ValueIdent str)) =
-        Just $ Ok $ singleton str value
-      matchPattern value (PVariant (TypeIdent expectedName) patterns) =
+      matchSubpatterns :: Env -> [Value] -> [Pattern] -> Maybe (Err Env)
+      matchSubpatterns env' values patterns =
+        if (length values) /= (length patterns)
+          then Just $ Bad $ "number of variant args does not match"
+          else Prelude.foldl go (Just $ Ok env') (zip values patterns) 
+            where 
+              go :: (Maybe (Err Env)) -> (Value, Pattern) -> (Maybe (Err Env))
+              go Nothing _ = Nothing
+              go (Just (Bad  s)) _ = Just $ Bad $ s
+              go (Just (Ok env'')) (value, pattern) =
+                matchPattern env'' value pattern
+
+      matchPattern :: Env -> Value -> Pattern -> Maybe (Err Env)
+      matchPattern env' value PAny = Just (Ok env')
+      matchPattern env' value (PValue (ValueIdent str)) =
+        Just $ Ok $ insert str value env'
+      matchPattern env' value (PVariant (TypeIdent expectedName) patterns) =
         case value of
           Variant variantName variantData -> 
-            if variantName == expectedName then Just $ Ok env else Nothing
+            if variantName == expectedName
+              then matchSubpatterns env' variantData patterns
+              else Nothing
           _ -> Just $ Bad $ 
             "you cannot match case with non variant value" ++ (show value)
 
       matchCasePart :: Value -> CasePart -> Maybe Result
       matchCasePart value (CaseP pattern thenExp) = 
-        case matchPattern value pattern of
+        case matchPattern env value pattern of
           Just (Ok env') -> Just $ transExp env' thenExp
           Just (Bad b) -> Just (Bad b)
           Nothing -> Nothing
