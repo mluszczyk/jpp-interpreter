@@ -2,6 +2,7 @@ EApp. Exp ::= Exp Exp1;
 EIf. Exp ::= "if" Exp "then" Exp "else" Exp ;
 ELet. Exp ::= "let" Ident "=" Exp "in" Exp ;
 EWhere. Exp ::= Exp "where" "{" [Decl] "}";
+ECase. Exp ::= "case" Exp "of" "{" [CasePart] "}" ;
 ELambda. Exp ::= "\\" Ident "->" Exp ;
 EAdd.	Exp	::=	Exp	"+"	Exp1	;
 ESub.	Exp	::=	Exp	"-"	Exp1	;
@@ -10,6 +11,15 @@ EDiv.	Exp1	::=	Exp1	"/"	Exp2	;
 EInt.	Exp2	::=	Integer	;
 EVar. Exp2 ::= Ident ;
 coercions	Exp	2	;
+
+CaseP. CasePart ::= Pattern "->" Exp;
+separator CasePart ";" ;
+
+PAny. Pattern ::= "_";
+PVariant. Pattern ::= Ident [Pattern] ;
+_. Pattern ::= "(" Pattern ")" ;
+separator Pattern " " ;
+
 
 TDecl. TypeDecl ::= Ident [Ident] ;
 -- e.g. `Blah a b c`

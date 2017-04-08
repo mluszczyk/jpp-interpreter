@@ -90,6 +90,7 @@ instance Print Exp where
     EIf exp1 exp2 exp3 -> prPrec i 0 (concatD [doc (showString "if"), prt 0 exp1, doc (showString "then"), prt 0 exp2, doc (showString "else"), prt 0 exp3])
     ELet id exp1 exp2 -> prPrec i 0 (concatD [doc (showString "let"), prt 0 id, doc (showString "="), prt 0 exp1, doc (showString "in"), prt 0 exp2])
     EWhere exp decls -> prPrec i 0 (concatD [prt 0 exp, doc (showString "where"), doc (showString "{"), prt 0 decls, doc (showString "}")])
+    ECase exp caseparts -> prPrec i 0 (concatD [doc (showString "case"), prt 0 exp, doc (showString "of"), doc (showString "{"), prt 0 caseparts, doc (showString "}")])
     ELambda id exp -> prPrec i 0 (concatD [doc (showString "\\"), prt 0 id, doc (showString "->"), prt 0 exp])
     EAdd exp1 exp2 -> prPrec i 0 (concatD [prt 0 exp1, doc (showString "+"), prt 1 exp2])
     ESub exp1 exp2 -> prPrec i 0 (concatD [prt 0 exp1, doc (showString "-"), prt 1 exp2])
@@ -98,6 +99,19 @@ instance Print Exp where
     EInt n -> prPrec i 2 (concatD [prt 0 n])
     EVar id -> prPrec i 2 (concatD [prt 0 id])
 
+instance Print CasePart where
+  prt i e = case e of
+    CaseP pattern exp -> prPrec i 0 (concatD [prt 0 pattern, doc (showString "->"), prt 0 exp])
+  prtList _ [] = (concatD [])
+  prtList _ [x] = (concatD [prt 0 x])
+  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString ";"), prt 0 xs])
+instance Print Pattern where
+  prt i e = case e of
+    PAny -> prPrec i 0 (concatD [doc (showString "_")])
+    PVariant id patterns -> prPrec i 0 (concatD [prt 0 id, prt 0 patterns])
+  prtList _ [] = (concatD [])
+  prtList _ [x] = (concatD [prt 0 x])
+  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString " "), prt 0 xs])
 instance Print TypeDecl where
   prt i e = case e of
     TDecl id ids -> prPrec i 0 (concatD [prt 0 id, prt 0 ids])

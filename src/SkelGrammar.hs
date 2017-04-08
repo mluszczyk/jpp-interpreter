@@ -18,6 +18,7 @@ transExp x = case x of
   EIf exp1 exp2 exp3 -> failure x
   ELet ident exp1 exp2 -> failure x
   EWhere exp decls -> failure x
+  ECase exp caseparts -> failure x
   ELambda ident exp -> failure x
   EAdd exp1 exp2 -> failure x
   ESub exp1 exp2 -> failure x
@@ -25,6 +26,13 @@ transExp x = case x of
   EDiv exp1 exp2 -> failure x
   EInt integer -> failure x
   EVar ident -> failure x
+transCasePart :: CasePart -> Result
+transCasePart x = case x of
+  CaseP pattern exp -> failure x
+transPattern :: Pattern -> Result
+transPattern x = case x of
+  PAny -> failure x
+  PVariant ident patterns -> failure x
 transTypeDecl :: TypeDecl -> Result
 transTypeDecl x = case x of
   TDecl ident idents -> failure x

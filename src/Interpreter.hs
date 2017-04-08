@@ -9,6 +9,7 @@ import Control.Monad.Fix
 import Data.Map as M
 import AbsGrammar
 import ErrM
+import Data.Maybe (catMaybes)
 type Result = Err Value
 
 data Value = Const Integer | Func (Value -> Result) |
@@ -93,5 +94,28 @@ transExp env x = case x of
         val <- transExp env arg
         f val
       _ -> Bad "cannot apply to a constant"
+  ECase exp caseParts ->
+    let 
+      matchPattern :: Value -> Pattern -> Maybe (Err Env)
+      matchPattern value PAny = Just (Ok env)
+      matchPattern value (PVariant (Ident expectedName) patterns) =
+        case value of
+          Variant variantName variantData -> 
+            if variantName == expectedName then Just $ Ok env else Nothing
+          _ -> Just $ Bad $ 
+            "you cannot match case with non variant value" ++ (show value)
+
+      matchCasePart :: Value -> CasePart -> Maybe Result
+      matchCasePart value (CaseP pattern thenExp) = 
+        case matchPattern value pattern of
+          Just (Ok env') -> Just $ transExp env' thenExp
+          Just (Bad b) -> Just (Bad b)
+          Nothing -> Nothing
+    in do
+      val <- transExp env exp
+      let matches = catMaybes $ Prelude.map (matchCasePart val) caseParts
+      case matches of 
+        [] -> Bad "exhausted pattern matching"
+        (a:_) -> a
 
 interpret = transExp empty

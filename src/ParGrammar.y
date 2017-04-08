@@ -11,6 +11,10 @@ import ErrM
 %name pExp Exp
 %name pExp1 Exp1
 %name pExp2 Exp2
+%name pCasePart CasePart
+%name pListCasePart ListCasePart
+%name pPattern Pattern
+%name pListPattern ListPattern
 %name pTypeDecl TypeDecl
 %name pTypeRef TypeRef
 %name pListTypeRef ListTypeRef
@@ -23,26 +27,30 @@ import ErrM
 %monad { Err } { thenM } { returnM }
 %tokentype {Token}
 %token
-  '(' { PT _ (TS _ 1) }
-  ')' { PT _ (TS _ 2) }
-  '*' { PT _ (TS _ 3) }
-  '+' { PT _ (TS _ 4) }
-  '-' { PT _ (TS _ 5) }
-  '->' { PT _ (TS _ 6) }
-  '/' { PT _ (TS _ 7) }
-  ';' { PT _ (TS _ 8) }
-  '=' { PT _ (TS _ 9) }
-  '\\' { PT _ (TS _ 10) }
-  'data' { PT _ (TS _ 11) }
-  'else' { PT _ (TS _ 12) }
-  'if' { PT _ (TS _ 13) }
-  'in' { PT _ (TS _ 14) }
-  'let' { PT _ (TS _ 15) }
-  'then' { PT _ (TS _ 16) }
-  'where' { PT _ (TS _ 17) }
-  '{' { PT _ (TS _ 18) }
-  '|' { PT _ (TS _ 19) }
-  '}' { PT _ (TS _ 20) }
+  ' ' { PT _ (TS _ 1) }
+  '(' { PT _ (TS _ 2) }
+  ')' { PT _ (TS _ 3) }
+  '*' { PT _ (TS _ 4) }
+  '+' { PT _ (TS _ 5) }
+  '-' { PT _ (TS _ 6) }
+  '->' { PT _ (TS _ 7) }
+  '/' { PT _ (TS _ 8) }
+  ';' { PT _ (TS _ 9) }
+  '=' { PT _ (TS _ 10) }
+  '\\' { PT _ (TS _ 11) }
+  '_' { PT _ (TS _ 12) }
+  'case' { PT _ (TS _ 13) }
+  'data' { PT _ (TS _ 14) }
+  'else' { PT _ (TS _ 15) }
+  'if' { PT _ (TS _ 16) }
+  'in' { PT _ (TS _ 17) }
+  'let' { PT _ (TS _ 18) }
+  'of' { PT _ (TS _ 19) }
+  'then' { PT _ (TS _ 20) }
+  'where' { PT _ (TS _ 21) }
+  '{' { PT _ (TS _ 22) }
+  '|' { PT _ (TS _ 23) }
+  '}' { PT _ (TS _ 24) }
 
 L_ident  { PT _ (TV $$) }
 L_integ  { PT _ (TI $$) }
@@ -58,6 +66,7 @@ Exp : Exp Exp1 { AbsGrammar.EApp $1 $2 }
     | 'if' Exp 'then' Exp 'else' Exp { AbsGrammar.EIf $2 $4 $6 }
     | 'let' Ident '=' Exp 'in' Exp { AbsGrammar.ELet $2 $4 $6 }
     | Exp 'where' '{' ListDecl '}' { AbsGrammar.EWhere $1 $4 }
+    | 'case' Exp 'of' '{' ListCasePart '}' { AbsGrammar.ECase $2 $5 }
     | '\\' Ident '->' Exp { AbsGrammar.ELambda $2 $4 }
     | Exp '+' Exp1 { AbsGrammar.EAdd $1 $3 }
     | Exp '-' Exp1 { AbsGrammar.ESub $1 $3 }
@@ -70,6 +79,20 @@ Exp2 :: { Exp }
 Exp2 : Integer { AbsGrammar.EInt $1 }
      | Ident { AbsGrammar.EVar $1 }
      | '(' Exp ')' { $2 }
+CasePart :: { CasePart }
+CasePart : Pattern '->' Exp { AbsGrammar.CaseP $1 $3 }
+ListCasePart :: { [CasePart] }
+ListCasePart : {- empty -} { [] }
+             | CasePart { (:[]) $1 }
+             | CasePart ';' ListCasePart { (:) $1 $3 }
+Pattern :: { Pattern }
+Pattern : '_' { AbsGrammar.PAny }
+        | Ident ListPattern { AbsGrammar.PVariant $1 $2 }
+        | '(' Pattern ')' { $2 }
+ListPattern :: { [Pattern] }
+ListPattern : {- empty -} { [] }
+            | Pattern { (:[]) $1 }
+            | Pattern ' ' ListPattern { (:) $1 $3 }
 TypeDecl :: { TypeDecl }
 TypeDecl : Ident ListIdent { AbsGrammar.TDecl $1 $2 }
 TypeRef :: { TypeRef }

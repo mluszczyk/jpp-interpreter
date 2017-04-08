@@ -13,6 +13,7 @@ data Exp
     | EIf Exp Exp Exp
     | ELet Ident Exp Exp
     | EWhere Exp [Decl]
+    | ECase Exp [CasePart]
     | ELambda Ident Exp
     | EAdd Exp Exp
     | ESub Exp Exp
@@ -20,6 +21,12 @@ data Exp
     | EDiv Exp Exp
     | EInt Integer
     | EVar Ident
+  deriving (Eq, Ord, Show, Read)
+
+data CasePart = CaseP Pattern Exp
+  deriving (Eq, Ord, Show, Read)
+
+data Pattern = PAny | PVariant Ident [Pattern]
   deriving (Eq, Ord, Show, Read)
 
 data TypeDecl = TDecl Ident [Ident]
