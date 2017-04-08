@@ -1,38 +1,44 @@
+token TypeIdent (upper (letter | digit | '_')*) ;
+token ValueIdent (lower (letter | digit | '_')*) ;
+
 EApp. Exp ::= Exp Exp1;
 EIf. Exp ::= "if" Exp "then" Exp "else" Exp ;
-ELet. Exp ::= "let" Ident "=" Exp "in" Exp ;
+ELet. Exp ::= "let" ValueIdent "=" Exp "in" Exp ;
 EWhere. Exp ::= Exp "where" "{" [Decl] "}";
 ECase. Exp ::= "case" Exp "of" "{" [CasePart] "}" ;
-ELambda. Exp ::= "\\" Ident "->" Exp ;
+ELambda. Exp ::= "\\" ValueIdent "->" Exp ;
 EAdd.	Exp	::=	Exp	"+"	Exp1	;
 ESub.	Exp	::=	Exp	"-"	Exp1	;
 EMul.	Exp1	::=	Exp1	"*"	Exp2	;
 EDiv.	Exp1	::=	Exp1	"/"	Exp2	;
 EInt.	Exp2	::=	Integer	;
-EVar. Exp2 ::= Ident ;
+EVarValue. Exp2 ::= ValueIdent ;
+EVarType. Exp2 ::= TypeIdent ;
 coercions	Exp	2	;
 
 CaseP. CasePart ::= Pattern "->" Exp;
 separator CasePart ";" ;
 
-PAny. Pattern ::= "_";
-PVariant. Pattern ::= Ident [Pattern] ;
+PAny. Pattern ::= "_" ;
+PValue. Pattern ::= ValueIdent ;
+PVariant. Pattern ::= TypeIdent [Pattern] ;
 _. Pattern ::= "(" Pattern ")" ;
-separator Pattern " " ;
+separator Pattern "" ;
 
-
-TDecl. TypeDecl ::= Ident [Ident] ;
+TDecl. TypeDecl ::= TypeIdent [ValueIdent] ;
+separator ValueIdent "" ;
 -- e.g. `Blah a b c`
 
-TRef. TypeRef ::= Ident [TypeRef] ;
+TRValue. TypeRef ::= ValueIdent ;
+TRVariant. TypeRef ::= TypeIdent [TypeRef] ;
 _. TypeRef ::= "(" TypeRef ")" ;
 separator TypeRef "" ;
 -- e.g. `Blah (Blah a b c) [Blah] ;
 
-Var. Variant ::= Ident [TypeRef] ;
+Var. Variant ::= TypeIdent [TypeRef] ;
 separator TypeRef "" ;
 
-DConst. Decl ::= Ident [Ident] "=" Exp ;
+DValue. Decl ::= ValueIdent [ValueIdent] "=" Exp ;
 DData. Decl ::= "data" TypeDecl "=" [Variant] ;
 
 separator Ident "" ; 

@@ -16,6 +16,7 @@ import ErrM
 %name pPattern Pattern
 %name pListPattern ListPattern
 %name pTypeDecl TypeDecl
+%name pListValueIdent ListValueIdent
 %name pTypeRef TypeRef
 %name pListTypeRef ListTypeRef
 %name pVariant Variant
@@ -27,47 +28,50 @@ import ErrM
 %monad { Err } { thenM } { returnM }
 %tokentype {Token}
 %token
-  ' ' { PT _ (TS _ 1) }
-  '(' { PT _ (TS _ 2) }
-  ')' { PT _ (TS _ 3) }
-  '*' { PT _ (TS _ 4) }
-  '+' { PT _ (TS _ 5) }
-  '-' { PT _ (TS _ 6) }
-  '->' { PT _ (TS _ 7) }
-  '/' { PT _ (TS _ 8) }
-  ';' { PT _ (TS _ 9) }
-  '=' { PT _ (TS _ 10) }
-  '\\' { PT _ (TS _ 11) }
-  '_' { PT _ (TS _ 12) }
-  'case' { PT _ (TS _ 13) }
-  'data' { PT _ (TS _ 14) }
-  'else' { PT _ (TS _ 15) }
-  'if' { PT _ (TS _ 16) }
-  'in' { PT _ (TS _ 17) }
-  'let' { PT _ (TS _ 18) }
-  'of' { PT _ (TS _ 19) }
-  'then' { PT _ (TS _ 20) }
-  'where' { PT _ (TS _ 21) }
-  '{' { PT _ (TS _ 22) }
-  '|' { PT _ (TS _ 23) }
-  '}' { PT _ (TS _ 24) }
+  '(' { PT _ (TS _ 1) }
+  ')' { PT _ (TS _ 2) }
+  '*' { PT _ (TS _ 3) }
+  '+' { PT _ (TS _ 4) }
+  '-' { PT _ (TS _ 5) }
+  '->' { PT _ (TS _ 6) }
+  '/' { PT _ (TS _ 7) }
+  ';' { PT _ (TS _ 8) }
+  '=' { PT _ (TS _ 9) }
+  '\\' { PT _ (TS _ 10) }
+  '_' { PT _ (TS _ 11) }
+  'case' { PT _ (TS _ 12) }
+  'data' { PT _ (TS _ 13) }
+  'else' { PT _ (TS _ 14) }
+  'if' { PT _ (TS _ 15) }
+  'in' { PT _ (TS _ 16) }
+  'let' { PT _ (TS _ 17) }
+  'of' { PT _ (TS _ 18) }
+  'then' { PT _ (TS _ 19) }
+  'where' { PT _ (TS _ 20) }
+  '{' { PT _ (TS _ 21) }
+  '|' { PT _ (TS _ 22) }
+  '}' { PT _ (TS _ 23) }
 
-L_ident  { PT _ (TV $$) }
 L_integ  { PT _ (TI $$) }
+L_ident  { PT _ (TV $$) }
+L_TypeIdent { PT _ (T_TypeIdent $$) }
+L_ValueIdent { PT _ (T_ValueIdent $$) }
 
 
 %%
 
-Ident   :: { Ident }   : L_ident  { Ident $1 }
 Integer :: { Integer } : L_integ  { (read ( $1)) :: Integer }
+Ident   :: { Ident }   : L_ident  { Ident $1 }
+TypeIdent    :: { TypeIdent} : L_TypeIdent { TypeIdent ($1)}
+ValueIdent    :: { ValueIdent} : L_ValueIdent { ValueIdent ($1)}
 
 Exp :: { Exp }
 Exp : Exp Exp1 { AbsGrammar.EApp $1 $2 }
     | 'if' Exp 'then' Exp 'else' Exp { AbsGrammar.EIf $2 $4 $6 }
-    | 'let' Ident '=' Exp 'in' Exp { AbsGrammar.ELet $2 $4 $6 }
+    | 'let' ValueIdent '=' Exp 'in' Exp { AbsGrammar.ELet $2 $4 $6 }
     | Exp 'where' '{' ListDecl '}' { AbsGrammar.EWhere $1 $4 }
     | 'case' Exp 'of' '{' ListCasePart '}' { AbsGrammar.ECase $2 $5 }
-    | '\\' Ident '->' Exp { AbsGrammar.ELambda $2 $4 }
+    | '\\' ValueIdent '->' Exp { AbsGrammar.ELambda $2 $4 }
     | Exp '+' Exp1 { AbsGrammar.EAdd $1 $3 }
     | Exp '-' Exp1 { AbsGrammar.ESub $1 $3 }
     | Exp1 { $1 }
@@ -77,7 +81,8 @@ Exp1 : Exp1 '*' Exp2 { AbsGrammar.EMul $1 $3 }
      | Exp2 { $1 }
 Exp2 :: { Exp }
 Exp2 : Integer { AbsGrammar.EInt $1 }
-     | Ident { AbsGrammar.EVar $1 }
+     | ValueIdent { AbsGrammar.EVarValue $1 }
+     | TypeIdent { AbsGrammar.EVarType $1 }
      | '(' Exp ')' { $2 }
 CasePart :: { CasePart }
 CasePart : Pattern '->' Exp { AbsGrammar.CaseP $1 $3 }
@@ -87,16 +92,20 @@ ListCasePart : {- empty -} { [] }
              | CasePart ';' ListCasePart { (:) $1 $3 }
 Pattern :: { Pattern }
 Pattern : '_' { AbsGrammar.PAny }
-        | Ident ListPattern { AbsGrammar.PVariant $1 $2 }
+        | ValueIdent { AbsGrammar.PValue $1 }
+        | TypeIdent ListPattern { AbsGrammar.PVariant $1 (reverse $2) }
         | '(' Pattern ')' { $2 }
 ListPattern :: { [Pattern] }
 ListPattern : {- empty -} { [] }
-            | Pattern { (:[]) $1 }
-            | Pattern ' ' ListPattern { (:) $1 $3 }
+            | ListPattern Pattern { flip (:) $1 $2 }
 TypeDecl :: { TypeDecl }
-TypeDecl : Ident ListIdent { AbsGrammar.TDecl $1 $2 }
+TypeDecl : TypeIdent ListValueIdent { AbsGrammar.TDecl $1 $2 }
+ListValueIdent :: { [ValueIdent] }
+ListValueIdent : {- empty -} { [] }
+               | ValueIdent ListValueIdent { (:) $1 $2 }
 TypeRef :: { TypeRef }
-TypeRef : Ident ListTypeRef { AbsGrammar.TRef $1 $2 }
+TypeRef : ValueIdent { AbsGrammar.TRValue $1 }
+        | TypeIdent ListTypeRef { AbsGrammar.TRVariant $1 $2 }
         | '(' TypeRef ')' { $2 }
 ListTypeRef :: { [TypeRef] }
 ListTypeRef : {- empty -} { [] }
@@ -104,9 +113,9 @@ ListTypeRef : {- empty -} { [] }
             | {- empty -} { [] }
             | TypeRef ListTypeRef { (:) $1 $2 }
 Variant :: { Variant }
-Variant : Ident ListTypeRef { AbsGrammar.Var $1 $2 }
+Variant : TypeIdent ListTypeRef { AbsGrammar.Var $1 $2 }
 Decl :: { Decl }
-Decl : Ident ListIdent '=' Exp { AbsGrammar.DConst $1 $2 $4 }
+Decl : ValueIdent ListValueIdent '=' Exp { AbsGrammar.DValue $1 $2 $4 }
      | 'data' TypeDecl '=' ListVariant { AbsGrammar.DData $2 $4 }
 ListIdent :: { [Ident] }
 ListIdent : {- empty -} { [] } | Ident ListIdent { (:) $1 $2 }

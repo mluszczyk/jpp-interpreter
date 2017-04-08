@@ -83,21 +83,31 @@ instance Print Ident where
   prtList _ [] = (concatD [])
   prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
 
+instance Print TypeIdent where
+  prt _ (TypeIdent i) = doc (showString ( i))
+
+
+instance Print ValueIdent where
+  prt _ (ValueIdent i) = doc (showString ( i))
+  prtList _ [] = (concatD [])
+  prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
+
 
 instance Print Exp where
   prt i e = case e of
     EApp exp1 exp2 -> prPrec i 0 (concatD [prt 0 exp1, prt 1 exp2])
     EIf exp1 exp2 exp3 -> prPrec i 0 (concatD [doc (showString "if"), prt 0 exp1, doc (showString "then"), prt 0 exp2, doc (showString "else"), prt 0 exp3])
-    ELet id exp1 exp2 -> prPrec i 0 (concatD [doc (showString "let"), prt 0 id, doc (showString "="), prt 0 exp1, doc (showString "in"), prt 0 exp2])
+    ELet valueident exp1 exp2 -> prPrec i 0 (concatD [doc (showString "let"), prt 0 valueident, doc (showString "="), prt 0 exp1, doc (showString "in"), prt 0 exp2])
     EWhere exp decls -> prPrec i 0 (concatD [prt 0 exp, doc (showString "where"), doc (showString "{"), prt 0 decls, doc (showString "}")])
     ECase exp caseparts -> prPrec i 0 (concatD [doc (showString "case"), prt 0 exp, doc (showString "of"), doc (showString "{"), prt 0 caseparts, doc (showString "}")])
-    ELambda id exp -> prPrec i 0 (concatD [doc (showString "\\"), prt 0 id, doc (showString "->"), prt 0 exp])
+    ELambda valueident exp -> prPrec i 0 (concatD [doc (showString "\\"), prt 0 valueident, doc (showString "->"), prt 0 exp])
     EAdd exp1 exp2 -> prPrec i 0 (concatD [prt 0 exp1, doc (showString "+"), prt 1 exp2])
     ESub exp1 exp2 -> prPrec i 0 (concatD [prt 0 exp1, doc (showString "-"), prt 1 exp2])
     EMul exp1 exp2 -> prPrec i 1 (concatD [prt 1 exp1, doc (showString "*"), prt 2 exp2])
     EDiv exp1 exp2 -> prPrec i 1 (concatD [prt 1 exp1, doc (showString "/"), prt 2 exp2])
     EInt n -> prPrec i 2 (concatD [prt 0 n])
-    EVar id -> prPrec i 2 (concatD [prt 0 id])
+    EVarValue valueident -> prPrec i 2 (concatD [prt 0 valueident])
+    EVarType typeident -> prPrec i 2 (concatD [prt 0 typeident])
 
 instance Print CasePart where
   prt i e = case e of
@@ -108,30 +118,31 @@ instance Print CasePart where
 instance Print Pattern where
   prt i e = case e of
     PAny -> prPrec i 0 (concatD [doc (showString "_")])
-    PVariant id patterns -> prPrec i 0 (concatD [prt 0 id, prt 0 patterns])
+    PValue valueident -> prPrec i 0 (concatD [prt 0 valueident])
+    PVariant typeident patterns -> prPrec i 0 (concatD [prt 0 typeident, prt 0 patterns])
   prtList _ [] = (concatD [])
-  prtList _ [x] = (concatD [prt 0 x])
-  prtList _ (x:xs) = (concatD [prt 0 x, doc (showString " "), prt 0 xs])
+  prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
 instance Print TypeDecl where
   prt i e = case e of
-    TDecl id ids -> prPrec i 0 (concatD [prt 0 id, prt 0 ids])
+    TDecl typeident valueidents -> prPrec i 0 (concatD [prt 0 typeident, prt 0 valueidents])
 
 instance Print TypeRef where
   prt i e = case e of
-    TRef id typerefs -> prPrec i 0 (concatD [prt 0 id, prt 0 typerefs])
+    TRValue valueident -> prPrec i 0 (concatD [prt 0 valueident])
+    TRVariant typeident typerefs -> prPrec i 0 (concatD [prt 0 typeident, prt 0 typerefs])
   prtList _ [] = (concatD [])
   prtList _ [] = (concatD [])
   prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
   prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
 instance Print Variant where
   prt i e = case e of
-    Var id typerefs -> prPrec i 0 (concatD [prt 0 id, prt 0 typerefs])
+    Var typeident typerefs -> prPrec i 0 (concatD [prt 0 typeident, prt 0 typerefs])
   prtList _ [] = (concatD [])
   prtList _ [x] = (concatD [prt 0 x])
   prtList _ (x:xs) = (concatD [prt 0 x, doc (showString "|"), prt 0 xs])
 instance Print Decl where
   prt i e = case e of
-    DConst id ids exp -> prPrec i 0 (concatD [prt 0 id, prt 0 ids, doc (showString "="), prt 0 exp])
+    DValue valueident valueidents exp -> prPrec i 0 (concatD [prt 0 valueident, prt 0 valueidents, doc (showString "="), prt 0 exp])
     DData typedecl variants -> prPrec i 0 (concatD [doc (showString "data"), prt 0 typedecl, doc (showString "="), prt 0 variants])
   prtList _ [] = (concatD [])
   prtList _ [x] = (concatD [prt 0 x])

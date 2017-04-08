@@ -12,38 +12,47 @@ failure x = Bad $ "Undefined case: " ++ show x
 transIdent :: Ident -> Result
 transIdent x = case x of
   Ident string -> failure x
+transTypeIdent :: TypeIdent -> Result
+transTypeIdent x = case x of
+  TypeIdent string -> failure x
+transValueIdent :: ValueIdent -> Result
+transValueIdent x = case x of
+  ValueIdent string -> failure x
 transExp :: Exp -> Result
 transExp x = case x of
   EApp exp1 exp2 -> failure x
   EIf exp1 exp2 exp3 -> failure x
-  ELet ident exp1 exp2 -> failure x
+  ELet valueident exp1 exp2 -> failure x
   EWhere exp decls -> failure x
   ECase exp caseparts -> failure x
-  ELambda ident exp -> failure x
+  ELambda valueident exp -> failure x
   EAdd exp1 exp2 -> failure x
   ESub exp1 exp2 -> failure x
   EMul exp1 exp2 -> failure x
   EDiv exp1 exp2 -> failure x
   EInt integer -> failure x
-  EVar ident -> failure x
+  EVarValue valueident -> failure x
+  EVarType typeident -> failure x
 transCasePart :: CasePart -> Result
 transCasePart x = case x of
   CaseP pattern exp -> failure x
 transPattern :: Pattern -> Result
 transPattern x = case x of
   PAny -> failure x
-  PVariant ident patterns -> failure x
+  PValue valueident -> failure x
+  PVariant typeident patterns -> failure x
 transTypeDecl :: TypeDecl -> Result
 transTypeDecl x = case x of
-  TDecl ident idents -> failure x
+  TDecl typeident valueidents -> failure x
 transTypeRef :: TypeRef -> Result
 transTypeRef x = case x of
-  TRef ident typerefs -> failure x
+  TRValue valueident -> failure x
+  TRVariant typeident typerefs -> failure x
 transVariant :: Variant -> Result
 transVariant x = case x of
-  Var ident typerefs -> failure x
+  Var typeident typerefs -> failure x
 transDecl :: Decl -> Result
 transDecl x = case x of
-  DConst ident idents exp -> failure x
+  DValue valueident valueidents exp -> failure x
   DData typedecl variants -> failure x
 

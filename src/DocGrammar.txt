@@ -17,10 +17,18 @@ reserved words excluded.
 
 
 ===Literals===
-
 Integer literals //Integer// are nonempty sequences of digits.
 
 
+
+
+
+
+TypeIdent literals are recognized by the regular expression
+`````upper (letter | digit | '_')*`````
+
+ValueIdent literals are recognized by the regular expression
+`````lower (letter | digit | '_')*`````
 
 
 ===Reserved words and symbols===
@@ -35,7 +43,7 @@ The symbols used in grammar are the following:
   | = | { | } | \
   | -> | + | - | *
   | / | ( | ) | ;
-  | _ |   | | | 
+  | _ | | |  | 
 
 ===Comments===
 There are no single-line comments in the grammar.There are no multiple-line comments in the grammar.
@@ -48,10 +56,10 @@ All other symbols are terminals.
 
   | //Exp// | -> | //Exp// //Exp1// 
   |  |  **|**  | ``if`` //Exp// ``then`` //Exp// ``else`` //Exp// 
-  |  |  **|**  | ``let`` //Ident// ``=`` //Exp// ``in`` //Exp// 
+  |  |  **|**  | ``let`` //ValueIdent// ``=`` //Exp// ``in`` //Exp// 
   |  |  **|**  | //Exp// ``where`` ``{`` //[Decl]// ``}`` 
   |  |  **|**  | ``case`` //Exp// ``of`` ``{`` //[CasePart]// ``}`` 
-  |  |  **|**  | ``\`` //Ident// ``->`` //Exp// 
+  |  |  **|**  | ``\`` //ValueIdent// ``->`` //Exp// 
   |  |  **|**  | //Exp// ``+`` //Exp1// 
   |  |  **|**  | //Exp// ``-`` //Exp1// 
   |  |  **|**  | //Exp1// 
@@ -59,27 +67,31 @@ All other symbols are terminals.
   |  |  **|**  | //Exp1// ``/`` //Exp2// 
   |  |  **|**  | //Exp2// 
   | //Exp2// | -> | //Integer// 
-  |  |  **|**  | //Ident// 
+  |  |  **|**  | //ValueIdent// 
+  |  |  **|**  | //TypeIdent// 
   |  |  **|**  | ``(`` //Exp// ``)`` 
   | //CasePart// | -> | //Pattern// ``->`` //Exp// 
   | //[CasePart]// | -> | **eps**
   |  |  **|**  | //CasePart// 
   |  |  **|**  | //CasePart// ``;`` //[CasePart]// 
   | //Pattern// | -> | ``_`` 
-  |  |  **|**  | //Ident// //[Pattern]// 
+  |  |  **|**  | //ValueIdent// 
+  |  |  **|**  | //TypeIdent// //[Pattern]// 
   |  |  **|**  | ``(`` //Pattern// ``)`` 
   | //[Pattern]// | -> | **eps**
-  |  |  **|**  | //Pattern// 
-  |  |  **|**  | //Pattern// `` `` //[Pattern]// 
-  | //TypeDecl// | -> | //Ident// //[Ident]// 
-  | //TypeRef// | -> | //Ident// //[TypeRef]// 
+  |  |  **|**  | //Pattern// //[Pattern]// 
+  | //TypeDecl// | -> | //TypeIdent// //[ValueIdent]// 
+  | //[ValueIdent]// | -> | **eps**
+  |  |  **|**  | //ValueIdent// //[ValueIdent]// 
+  | //TypeRef// | -> | //ValueIdent// 
+  |  |  **|**  | //TypeIdent// //[TypeRef]// 
   |  |  **|**  | ``(`` //TypeRef// ``)`` 
   | //[TypeRef]// | -> | **eps**
   |  |  **|**  | //TypeRef// //[TypeRef]// 
   |  |  **|**  | **eps**
   |  |  **|**  | //TypeRef// //[TypeRef]// 
-  | //Variant// | -> | //Ident// //[TypeRef]// 
-  | //Decl// | -> | //Ident// //[Ident]// ``=`` //Exp// 
+  | //Variant// | -> | //TypeIdent// //[TypeRef]// 
+  | //Decl// | -> | //ValueIdent// //[ValueIdent]// ``=`` //Exp// 
   |  |  **|**  | ``data`` //TypeDecl// ``=`` //[Variant]// 
   | //[Ident]// | -> | **eps**
   |  |  **|**  | //Ident// //[Ident]// 

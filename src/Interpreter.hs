@@ -41,7 +41,7 @@ transConstructor name (arg:rest) values =
   Func (\v -> Ok $ transConstructor name rest (values ++ [v]))
 
 transDecl :: Env -> Decl -> Err Env
-transDecl env (DConst (Ident name) argsIdents exp) =
+transDecl env (DValue (ValueIdent name) argsIdents exp) =
   let composeLambdas argIdent partialExp = ELambda argIdent partialExp in
   let func = Prelude.foldr composeLambdas exp argsIdents
   in do
@@ -51,7 +51,7 @@ transDecl env (DConst (Ident name) argsIdents exp) =
 transDecl env (DData declIgnored variants) =
   foldM go env variants where
     go :: Env -> Variant -> Err Env
-    go env' (Var (Ident name) args) =
+    go env' (Var (TypeIdent name) args) =
       Ok $ insert name (transConstructor name args []) env'
 
 transExp :: Env -> Exp -> Result
@@ -65,12 +65,16 @@ transExp env x = case x of
     env' <- foldM transDecl env decls
     v1 <- transExp env' exp
     return v1
-  ELet (Ident str) exp1 exp2 -> do
+  ELet (ValueIdent str) exp1 exp2 -> do
     rec v1 <- transExp (insert str v1 env) exp1
     let env' = insert str v1 env
     v2 <- transExp env' exp2
     return v2
-  EVar (Ident ident) ->
+  EVarValue (ValueIdent ident) ->
+    maybe (Bad $ "identifier " ++ ident ++ " unset") Ok maybeVal where
+      maybeVal :: Maybe Value
+      maybeVal = M.lookup ident env
+  EVarType (TypeIdent ident) ->
     maybe (Bad $ "identifier " ++ ident ++ " unset") Ok maybeVal where
       maybeVal :: Maybe Value
       maybeVal = M.lookup ident env
@@ -83,7 +87,7 @@ transExp env x = case x of
         else
           transExp env exp3
       _ -> Bad $ "function is not a condition"
-  ELambda (Ident ident) exp ->
+  ELambda (ValueIdent ident) exp ->
     Ok (Func func) where
       func arg = transExp env' exp where
         env' = insert ident arg env
@@ -98,7 +102,9 @@ transExp env x = case x of
     let 
       matchPattern :: Value -> Pattern -> Maybe (Err Env)
       matchPattern value PAny = Just (Ok env)
-      matchPattern value (PVariant (Ident expectedName) patterns) =
+      matchPattern value (PValue (ValueIdent str)) =
+        Just $ Ok $ singleton str value
+      matchPattern value (PVariant (TypeIdent expectedName) patterns) =
         case value of
           Variant variantName variantData -> 
             if variantName == expectedName then Just $ Ok env else Nothing
