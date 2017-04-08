@@ -24,6 +24,7 @@ $u = [\0-\255]          -- universal: any character
    \= | \{ | \} | \\ | \- \> | \+ | \- | \* | \/ | \( | \) | \; | \_ | \|
 
 :-
+"--" [.]* ; -- Toss single line comments
 
 $white+ ;
 @rsyms { tok (\p s -> PT p (eitherResIdent (TV . share) s)) }

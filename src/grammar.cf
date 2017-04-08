@@ -1,3 +1,5 @@
+comment "--" ;
+
 token TypeIdent (upper (letter | digit | '_')*) ;
 token ValueIdent (lower (letter | digit | '_')*) ;
 
@@ -44,4 +46,3 @@ DData. Decl ::= "data" TypeDecl "=" [Variant] ;
 separator Ident "" ; 
 separator Decl ";" ;
 separator Variant "|" ;
-
