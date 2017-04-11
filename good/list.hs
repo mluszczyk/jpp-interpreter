@@ -1,3 +1,3 @@
-(Cons 1 Nil) where {
-  data List a = Cons (a) (List a) | Nil
-}
+data List a = Cons (a) (List a) | Nil;
+
+main = Cons 1 Nil

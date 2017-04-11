@@ -1,48 +1,59 @@
 comment "--" ;
 
+layout "let", "where", "of" ;
+layout stop "in" ;
+layout toplevel ;
+
 token TypeIdent (upper (letter | digit | '_')*) ;
 token ValueIdent (lower (letter | digit | '_')*) ;
 
-EApp. Exp ::= Exp Exp1;
-EIf. Exp ::= "if" Exp "then" Exp "else" Exp ;
-ELet. Exp ::= "let" ValueIdent "=" Exp "in" Exp ;
-EWhere. Exp ::= Exp "where" "{" [Decl] "}";
+Program. Program ::= [Decl] ;
+
+ELet. Exp ::= "let" "{" [Decl] "}" "in" Exp ;
 ECase. Exp ::= "case" Exp "of" "{" [CasePart] "}" ;
 ELambda. Exp ::= "\\" ValueIdent "->" Exp ;
-EAdd.	Exp	::=	Exp	"+"	Exp1	;
-ESub.	Exp	::=	Exp	"-"	Exp1	;
-EMul.	Exp1	::=	Exp1	"*"	Exp2	;
-EDiv.	Exp1	::=	Exp1	"/"	Exp2	;
-EInt.	Exp2	::=	Integer	;
-EVarValue. Exp2 ::= ValueIdent ;
-EVarType. Exp2 ::= TypeIdent ;
-coercions	Exp	2	;
+EIf. Exp ::= "if" Exp "then" Exp "else" Exp ;
+
+EAdd.	Exp1	::=	Exp1	"+"	Exp2	;
+ESub.	Exp1	::=	Exp1	"-"	Exp2	;
+EMul.	Exp2	::=	Exp2	"*"	Exp3	;
+EDiv.	Exp2	::=	Exp2	"/"	Exp3	;
+
+EApp. Exp10 ::= Exp10 Exp11;
+
+EInt.	Exp11	::=	Integer	;
+EVarValue. Exp11 ::= ValueIdent ;
+EVarType. Exp11 ::= TypeIdent ;
+coercions	Exp	11	;
+
+DValue. Decl ::= ValueIdent [ValueIdent] "=" Exp ;
+DValueWhere. Decl ::= ValueIdent [ValueIdent] "=" Exp "where" "{" [Decl] "}" ;
+DData. Decl ::= "data" TypeDecl "=" [Variant] ;
 
 CaseP. CasePart ::= Pattern "->" Exp;
 separator CasePart ";" ;
 
-PAny. Pattern ::= "_" ;
-PValue. Pattern ::= ValueIdent ;
-PVariant. Pattern ::= TypeIdent [Pattern] ;
-_. Pattern ::= "(" Pattern ")" ;
-separator Pattern "" ;
+PVariant. Pattern ::= TypeIdent [Pattern1] ;
+PValue. Pattern1 ::= ValueIdent ;
+PAny. Pattern1 ::= "_" ;
+coercions Pattern 1 ;
+separator Pattern1 "" ;
 
 TDecl. TypeDecl ::= TypeIdent [ValueIdent] ;
 separator ValueIdent "" ;
 -- e.g. `Blah a b c`
 
-TRValue. TypeRef ::= ValueIdent ;
-TRVariant. TypeRef ::= TypeIdent [TypeRef] ;
-_. TypeRef ::= "(" TypeRef ")" ;
-separator TypeRef "" ;
+TRVariant. TypeRef ::= TypeIdent [TypeRef1] ;
+TRValue. TypeRef1 ::= ValueIdent ;
+TRSimpleVariant. TypeRef1 ::= TypeIdent ;
+coercions TypeRef 1;
+separator nonempty TypeRef1 "" ;
+
 -- e.g. `Blah (Blah a b c) [Blah] ;
 
-Var. Variant ::= TypeIdent [TypeRef] ;
-separator TypeRef "" ;
+Var. Variant ::= TypeIdent [TypeRef1] ;
+SimpleVar. Variant ::= TypeIdent ;
 
-DValue. Decl ::= ValueIdent [ValueIdent] "=" Exp ;
-DData. Decl ::= "data" TypeDecl "=" [Variant] ;
-
-separator Ident "" ; 
-separator Decl ";" ;
+separator Ident "" ;
 separator Variant "|" ;
+separator Decl ";" ;

@@ -52,6 +52,13 @@ transDecl evalEnv envStub (DData declIgnored variants) =
     go :: Env -> Variant -> Err Env
     go env' (Var (TypeIdent name) args) =
       Ok $ insert name (transConstructor name args []) env'
+    go env' (SimpleVar (TypeIdent name)) =
+      Ok $ insert name (transConstructor name [] []) env'
+
+transDecls :: Env -> [Decl] -> Err Env
+transDecls env decls = do
+    rec env' <- foldM (transDecl env') env decls
+    return env'
 
 transExp :: Env -> Exp -> Result
 transExp env x = case x of
@@ -60,15 +67,10 @@ transExp env x = case x of
   EMul exp1 exp2 -> arithm (*) env exp1 exp2
   EDiv exp1 exp2 -> Bad "integer division not implemented"
   EInt integer -> Ok $ Const $ integer
-  EWhere exp decls -> do
-    rec env' <- foldM (transDecl env') env decls
+  ELet decls exp -> do
+    env' <- transDecls env decls
     v1 <- transExp env' exp
     return v1
-  ELet (ValueIdent str) exp1 exp2 -> do
-    rec v1 <- transExp (insert str v1 env) exp1
-    let env' = insert str v1 env
-    v2 <- transExp env' exp2
-    return v2
   EVarValue (ValueIdent ident) ->
     maybe (Bad $ "identifier " ++ ident ++ " unset") Ok maybeVal where
       maybeVal :: Maybe Value
@@ -137,4 +139,9 @@ transExp env x = case x of
         [] -> Bad "exhausted pattern matching"
         (a:_) -> a
 
-interpret = transExp empty
+interpret :: Program -> Result
+interpret (Program decls) = do
+  env <- transDecls empty decls
+  val <- transExp env (EVarValue (ValueIdent "main"))
+  return val
+

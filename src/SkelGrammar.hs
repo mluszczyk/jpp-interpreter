@@ -18,41 +18,46 @@ transTypeIdent x = case x of
 transValueIdent :: ValueIdent -> Result
 transValueIdent x = case x of
   ValueIdent string -> failure x
+transProgram :: Program -> Result
+transProgram x = case x of
+  Program decls -> failure x
 transExp :: Exp -> Result
 transExp x = case x of
-  EApp exp1 exp2 -> failure x
-  EIf exp1 exp2 exp3 -> failure x
-  ELet valueident exp1 exp2 -> failure x
-  EWhere exp decls -> failure x
+  ELet decls exp -> failure x
   ECase exp caseparts -> failure x
   ELambda valueident exp -> failure x
+  EIf exp1 exp2 exp3 -> failure x
   EAdd exp1 exp2 -> failure x
   ESub exp1 exp2 -> failure x
   EMul exp1 exp2 -> failure x
   EDiv exp1 exp2 -> failure x
+  EApp exp1 exp2 -> failure x
   EInt integer -> failure x
   EVarValue valueident -> failure x
   EVarType typeident -> failure x
+transDecl :: Decl -> Result
+transDecl x = case x of
+  DValue valueident valueidents exp -> failure x
+  DValueWhere valueident valueidents exp decls -> failure x
+  DData typedecl variants -> failure x
 transCasePart :: CasePart -> Result
 transCasePart x = case x of
   CaseP pattern exp -> failure x
 transPattern :: Pattern -> Result
 transPattern x = case x of
-  PAny -> failure x
-  PValue valueident -> failure x
   PVariant typeident patterns -> failure x
+  PValue valueident -> failure x
+  PAny -> failure x
 transTypeDecl :: TypeDecl -> Result
 transTypeDecl x = case x of
   TDecl typeident valueidents -> failure x
 transTypeRef :: TypeRef -> Result
 transTypeRef x = case x of
-  TRValue valueident -> failure x
   TRVariant typeident typerefs -> failure x
+  TRValue valueident -> failure x
+  TRSimpleVariant typeident -> failure x
 transVariant :: Variant -> Result
 transVariant x = case x of
   Var typeident typerefs -> failure x
-transDecl :: Decl -> Result
-transDecl x = case x of
-  DValue valueident valueidents exp -> failure x
-  DData typedecl variants -> failure x
+  SimpleVar typeident -> failure x
 

@@ -1,3 +1,3 @@
-case 1 of {
+main = case 1 of {
   a -> a + 1
 }
