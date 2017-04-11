@@ -106,7 +106,7 @@ instance Print Exp where
     EAdd exp1 exp2 -> prPrec i 1 (concatD [prt 1 exp1, doc (showString "+"), prt 2 exp2])
     ESub exp1 exp2 -> prPrec i 1 (concatD [prt 1 exp1, doc (showString "-"), prt 2 exp2])
     EMul exp1 exp2 -> prPrec i 2 (concatD [prt 2 exp1, doc (showString "*"), prt 3 exp2])
-    EDiv exp1 exp2 -> prPrec i 2 (concatD [prt 2 exp1, doc (showString "/"), prt 3 exp2])
+    EDiv exp1 exp2 -> prPrec i 2 (concatD [prt 2 exp1, doc (showString "`div`"), prt 3 exp2])
     EApp exp1 exp2 -> prPrec i 10 (concatD [prt 10 exp1, prt 11 exp2])
     EInt n -> prPrec i 11 (concatD [prt 0 n])
     EVarValue valueident -> prPrec i 11 (concatD [prt 0 valueident])

@@ -17,7 +17,7 @@ EIf. Exp ::= "if" Exp "then" Exp "else" Exp ;
 EAdd.	Exp1	::=	Exp1	"+"	Exp2	;
 ESub.	Exp1	::=	Exp1	"-"	Exp2	;
 EMul.	Exp2	::=	Exp2	"*"	Exp3	;
-EDiv.	Exp2	::=	Exp2	"/"	Exp3	;
+EDiv.	Exp2	::=	Exp2	"`div`"	Exp3	;
 
 EApp. Exp10 ::= Exp10 Exp11;
 

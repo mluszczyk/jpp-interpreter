@@ -64,7 +64,11 @@ transExp env x = case x of
   EAdd exp1 exp2 -> arithm (+) env exp1 exp2
   ESub exp1 exp2 -> arithm (-) env exp1 exp2
   EMul exp1 exp2 -> arithm (*) env exp1 exp2
-  EDiv exp1 exp2 -> Bad "integer division not implemented"
+  EDiv exp1 exp2 -> do
+    v2 <- transExp env exp2
+    case v2 of
+      Const i2 | i2 == 0 -> Bad "division by 0"
+      _ -> arithm div env exp1 exp2
   EInt integer -> Ok $ Const $ integer
   ELet decls exp -> do
     env' <- transDecls env decls

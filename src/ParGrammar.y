@@ -46,11 +46,11 @@ import ErrM
   '+' { PT _ (TS _ 4) }
   '-' { PT _ (TS _ 5) }
   '->' { PT _ (TS _ 6) }
-  '/' { PT _ (TS _ 7) }
-  ';' { PT _ (TS _ 8) }
-  '=' { PT _ (TS _ 9) }
-  '\\' { PT _ (TS _ 10) }
-  '_' { PT _ (TS _ 11) }
+  ';' { PT _ (TS _ 7) }
+  '=' { PT _ (TS _ 8) }
+  '\\' { PT _ (TS _ 9) }
+  '_' { PT _ (TS _ 10) }
+  '`div`' { PT _ (TS _ 11) }
   'case' { PT _ (TS _ 12) }
   'data' { PT _ (TS _ 13) }
   'else' { PT _ (TS _ 14) }
@@ -91,7 +91,7 @@ Exp1 : Exp1 '+' Exp2 { AbsGrammar.EAdd $1 $3 }
      | Exp2 { $1 }
 Exp2 :: { Exp }
 Exp2 : Exp2 '*' Exp3 { AbsGrammar.EMul $1 $3 }
-     | Exp2 '/' Exp3 { AbsGrammar.EDiv $1 $3 }
+     | Exp2 '`div`' Exp3 { AbsGrammar.EDiv $1 $3 }
      | Exp3 { $1 }
 Exp10 :: { Exp }
 Exp10 : Exp10 Exp11 { AbsGrammar.EApp $1 $2 } | Exp11 { $1 }

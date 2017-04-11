@@ -21,7 +21,7 @@ $i = [$l $d _ ']          -- identifier character
 $u = [\0-\255]          -- universal: any character
 
 @rsyms =    -- symbols and non-identifier-like reserved words
-   \{ | \} | \\ | \- \> | \+ | \- | \* | \/ | \( | \) | \= | \; | \_ | \|
+   \{ | \} | \\ | \- \> | \+ | \- | \* | \` "div" \` | \( | \) | \= | \; | \_ | \|
 
 :-
 "--" [.]* ; -- Toss single line comments
@@ -103,7 +103,7 @@ eitherResIdent tv s = treeFind resWords
                               | s == a = t
 
 resWords :: BTree
-resWords = b "case" 12 (b "->" 6 (b "*" 3 (b ")" 2 (b "(" 1 N N) N) (b "-" 5 (b "+" 4 N N) N)) (b "=" 9 (b ";" 8 (b "/" 7 N N) N) (b "_" 11 (b "\\" 10 N N) N))) (b "of" 18 (b "if" 15 (b "else" 14 (b "data" 13 N N) N) (b "let" 17 (b "in" 16 N N) N)) (b "{" 21 (b "where" 20 (b "then" 19 N N) N) (b "}" 23 (b "|" 22 N N) N)))
+resWords = b "case" 12 (b "->" 6 (b "*" 3 (b ")" 2 (b "(" 1 N N) N) (b "-" 5 (b "+" 4 N N) N)) (b "\\" 9 (b "=" 8 (b ";" 7 N N) N) (b "`div`" 11 (b "_" 10 N N) N))) (b "of" 18 (b "if" 15 (b "else" 14 (b "data" 13 N N) N) (b "let" 17 (b "in" 16 N N) N)) (b "{" 21 (b "where" 20 (b "then" 19 N N) N) (b "}" 23 (b "|" 22 N N) N)))
    where b s n = let bs = id s
                   in B bs (TS bs n)
 
