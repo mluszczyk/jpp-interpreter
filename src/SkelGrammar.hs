@@ -27,6 +27,12 @@ transExp x = case x of
   ECase exp caseparts -> failure x
   ELambda valueident exp -> failure x
   EIf exp1 exp2 exp3 -> failure x
+  ELT exp1 exp2 -> failure x
+  ELTE exp1 exp2 -> failure x
+  EGT exp1 exp2 -> failure x
+  EGTE exp1 exp2 -> failure x
+  EEq exp1 exp2 -> failure x
+  ENEq exp1 exp2 -> failure x
   EAdd exp1 exp2 -> failure x
   ESub exp1 exp2 -> failure x
   EMul exp1 exp2 -> failure x

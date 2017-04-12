@@ -30,6 +30,14 @@ arithm op env exp1 exp2 = do
     (Const i1, Const i2) -> Ok $ Const (i1 `op` i2)
     _ -> Bad $ "arithmetic operations only supported for consts"
 
+intCompare :: (Integer -> Integer -> Bool) -> Env -> Exp -> Exp -> Result
+intCompare op env exp1 exp2 = do
+  v1 <- transExp env exp1
+  v2 <- transExp env exp2
+  case (v1, v2) of 
+    (Const i1, Const i2) -> Ok $ boolToLang (i1 `op` i2)
+    _ -> Bad $ "comparisons only supported for consts"
+
 instance MonadFix (Err) where
     mfix f = let a = f (unRight a) in a
              where unRight (Ok x) = x
@@ -69,6 +77,12 @@ transExp env x = case x of
     case v2 of
       Const i2 | i2 == 0 -> Bad "division by 0"
       _ -> arithm div env exp1 exp2
+
+  ELT exp1 exp2 -> intCompare (<) env exp1 exp2
+  ELTE exp1 exp2 -> intCompare (<=) env exp1 exp2
+  EGT exp1 exp2 -> intCompare (>) env exp1 exp2
+  EGTE exp1 exp2 -> intCompare (>=) env exp1 exp2
+
   EInt integer -> Ok $ Const $ integer
   ELet decls exp -> do
     env' <- transDecls env decls
@@ -138,9 +152,22 @@ transExp env x = case x of
         [] -> Bad "exhausted pattern matching"
         (a:_) -> a
 
+trueVariant = Var (TypeIdent "True") []
+falseVariant = Var (TypeIdent "False") []
+
+boolToLang :: Bool -> Value
+boolToLang False = Variant "False" []
+boolToLang True = Variant "True" []
+
+builtins :: Err Env
+builtins =
+  transDecls empty [
+    DData (TDecl (TypeIdent "Bool") []) [trueVariant, falseVariant]
+  ]
+
 interpret :: Program -> Result
 interpret (Program decls) = do
-  env <- transDecls empty decls
+  builtinEnv <- builtins
+  env <- transDecls builtinEnv decls
   val <- transExp env (EVarValue (ValueIdent "main"))
   return val
-

@@ -12,9 +12,9 @@ import ErrM
 %name pExp Exp
 %name pExp1 Exp1
 %name pExp2 Exp2
+%name pExp3 Exp3
 %name pExp10 Exp10
 %name pExp11 Exp11
-%name pExp3 Exp3
 %name pExp4 Exp4
 %name pExp5 Exp5
 %name pExp6 Exp6
@@ -46,23 +46,29 @@ import ErrM
   '+' { PT _ (TS _ 4) }
   '-' { PT _ (TS _ 5) }
   '->' { PT _ (TS _ 6) }
-  ';' { PT _ (TS _ 7) }
-  '=' { PT _ (TS _ 8) }
-  '\\' { PT _ (TS _ 9) }
-  '_' { PT _ (TS _ 10) }
-  '`div`' { PT _ (TS _ 11) }
-  'case' { PT _ (TS _ 12) }
-  'data' { PT _ (TS _ 13) }
-  'else' { PT _ (TS _ 14) }
-  'if' { PT _ (TS _ 15) }
-  'in' { PT _ (TS _ 16) }
-  'let' { PT _ (TS _ 17) }
-  'of' { PT _ (TS _ 18) }
-  'then' { PT _ (TS _ 19) }
-  'where' { PT _ (TS _ 20) }
-  '{' { PT _ (TS _ 21) }
-  '|' { PT _ (TS _ 22) }
-  '}' { PT _ (TS _ 23) }
+  '/=' { PT _ (TS _ 7) }
+  ';' { PT _ (TS _ 8) }
+  '<' { PT _ (TS _ 9) }
+  '<=' { PT _ (TS _ 10) }
+  '=' { PT _ (TS _ 11) }
+  '==' { PT _ (TS _ 12) }
+  '>' { PT _ (TS _ 13) }
+  '>=' { PT _ (TS _ 14) }
+  '\\' { PT _ (TS _ 15) }
+  '_' { PT _ (TS _ 16) }
+  '`div`' { PT _ (TS _ 17) }
+  'case' { PT _ (TS _ 18) }
+  'data' { PT _ (TS _ 19) }
+  'else' { PT _ (TS _ 20) }
+  'if' { PT _ (TS _ 21) }
+  'in' { PT _ (TS _ 22) }
+  'let' { PT _ (TS _ 23) }
+  'of' { PT _ (TS _ 24) }
+  'then' { PT _ (TS _ 25) }
+  'where' { PT _ (TS _ 26) }
+  '{' { PT _ (TS _ 27) }
+  '|' { PT _ (TS _ 28) }
+  '}' { PT _ (TS _ 29) }
 
 L_integ  { PT _ (TI $$) }
 L_ident  { PT _ (TV $$) }
@@ -86,13 +92,21 @@ Exp : 'let' '{' ListDecl '}' 'in' Exp { AbsGrammar.ELet $3 $6 }
     | 'if' Exp 'then' Exp 'else' Exp { AbsGrammar.EIf $2 $4 $6 }
     | Exp1 { $1 }
 Exp1 :: { Exp }
-Exp1 : Exp1 '+' Exp2 { AbsGrammar.EAdd $1 $3 }
-     | Exp1 '-' Exp2 { AbsGrammar.ESub $1 $3 }
+Exp1 : Exp1 '<' Exp2 { AbsGrammar.ELT $1 $3 }
+     | Exp1 '<=' Exp2 { AbsGrammar.ELTE $1 $3 }
+     | Exp1 '>' Exp2 { AbsGrammar.EGT $1 $3 }
+     | Exp1 '>=' Exp2 { AbsGrammar.EGTE $1 $3 }
+     | Exp1 '==' Exp2 { AbsGrammar.EEq $1 $3 }
+     | Exp1 '/=' Exp2 { AbsGrammar.ENEq $1 $3 }
      | Exp2 { $1 }
 Exp2 :: { Exp }
-Exp2 : Exp2 '*' Exp3 { AbsGrammar.EMul $1 $3 }
-     | Exp2 '`div`' Exp3 { AbsGrammar.EDiv $1 $3 }
+Exp2 : Exp2 '+' Exp3 { AbsGrammar.EAdd $1 $3 }
+     | Exp2 '-' Exp3 { AbsGrammar.ESub $1 $3 }
      | Exp3 { $1 }
+Exp3 :: { Exp }
+Exp3 : Exp3 '*' Exp4 { AbsGrammar.EMul $1 $3 }
+     | Exp3 '`div`' Exp4 { AbsGrammar.EDiv $1 $3 }
+     | Exp4 { $1 }
 Exp10 :: { Exp }
 Exp10 : Exp10 Exp11 { AbsGrammar.EApp $1 $2 } | Exp11 { $1 }
 Exp11 :: { Exp }
@@ -100,8 +114,6 @@ Exp11 : Integer { AbsGrammar.EInt $1 }
       | ValueIdent { AbsGrammar.EVarValue $1 }
       | TypeIdent { AbsGrammar.EVarType $1 }
       | '(' Exp ')' { $2 }
-Exp3 :: { Exp }
-Exp3 : Exp4 { $1 }
 Exp4 :: { Exp }
 Exp4 : Exp5 { $1 }
 Exp5 :: { Exp }
