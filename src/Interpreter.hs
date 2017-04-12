@@ -67,6 +67,22 @@ transDecls env decls = do
     rec env' <- foldM (transDecl env') env decls
     return env'
 
+valsEqual :: Value -> Value -> Err Bool
+valsEqual val1 val2 = 
+  case (val1, val2) of
+    (Const i1, Const i2) -> Ok $ (i1 == i2)
+    (Variant s1 d1, Variant s2 d2) -> do
+      blist <- mapM (uncurry valsEqual) (zip d1 d2)
+      return $ s1 == s2 && (length d1) == (length d2) && (all id blist) 
+    (_, _) -> Bad $ "uncomparable types"
+
+isEqual :: Env -> Exp -> Exp -> Err Bool
+isEqual env exp1 exp2 = do
+  val1 <- transExp env exp1
+  val2 <- transExp env exp2
+  eq <- valsEqual val1 val2
+  return $ eq
+
 transExp :: Env -> Exp -> Result
 transExp env x = case x of
   EAdd exp1 exp2 -> arithm (+) env exp1 exp2
@@ -82,6 +98,13 @@ transExp env x = case x of
   ELTE exp1 exp2 -> intCompare (<=) env exp1 exp2
   EGT exp1 exp2 -> intCompare (>) env exp1 exp2
   EGTE exp1 exp2 -> intCompare (>=) env exp1 exp2
+
+  EEq exp1 exp2 -> do
+    eq <- isEqual env exp1 exp2
+    return $ boolToLang eq
+  ENEq exp1 exp2 -> do
+    eq <- isEqual env exp1 exp2
+    return $ boolToLang $ not eq
 
   EInt integer -> Ok $ Const $ integer
   ELet decls exp -> do
