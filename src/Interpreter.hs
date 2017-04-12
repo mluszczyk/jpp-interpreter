@@ -117,13 +117,11 @@ transExp env x = case x of
     maybe (Bad $ "identifier " ++ ident ++ " unset") id (M.lookup ident env)
   EIf exp1 exp2 exp3 -> do
     v1 <- transExp env exp1
-    case v1 of 
-      Const i1 -> 
-        if i1 /= 0 then
-          transExp env exp2
-        else
-          transExp env exp3
-      _ -> Bad $ "function is not a condition"
+    b <- boolFromValue v1
+    if b then
+      transExp env exp2
+    else
+      transExp env exp3
   ELambda (ValueIdent ident) exp ->
     Ok (Func func) where
       func arg = transExp env' exp where
@@ -174,6 +172,11 @@ transExp env x = case x of
       case matches of 
         [] -> Bad "exhausted pattern matching"
         (a:_) -> a
+
+boolFromValue :: Value -> Err Bool
+boolFromValue v@(Variant "True" []) = Ok True
+boolFromValue v@(Variant "False" []) = Ok False
+boolFromValue _ = Bad "expected boolean"
 
 trueVariant = Var (TypeIdent "True") []
 falseVariant = Var (TypeIdent "False") []
