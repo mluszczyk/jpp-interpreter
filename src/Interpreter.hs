@@ -105,6 +105,20 @@ transExp env x = case x of
   ENEq exp1 exp2 -> do
     eq <- isEqual env exp1 exp2
     return $ boolToLang $ not eq
+ 
+  EAnd exp1 exp2 -> do
+    val1 <- transExp env exp1
+    val2 <- transExp env exp2
+    b1 <- boolFromValue val1
+    b2 <- boolFromValue val2
+    return $ boolToLang $ b1 && b2
+
+  EOr exp1 exp2 -> do
+    val1 <- transExp env exp1
+    val2 <- transExp env exp2
+    b1 <- boolFromValue val1
+    b2 <- boolFromValue val2
+    return $ boolToLang $ b1 || b2
 
   EInt integer -> Ok $ Const $ integer
   ELet decls exp -> do

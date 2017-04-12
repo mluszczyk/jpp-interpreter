@@ -19,6 +19,8 @@ data Exp
     | ECase Exp [CasePart]
     | ELambda ValueIdent Exp
     | EIf Exp Exp Exp
+    | EAnd Exp Exp
+    | EOr Exp Exp
     | ELT Exp Exp
     | ELTE Exp Exp
     | EGT Exp Exp

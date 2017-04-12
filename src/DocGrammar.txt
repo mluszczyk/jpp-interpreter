@@ -41,10 +41,11 @@ The reserved words used in grammar are the following:
 
 The symbols used in grammar are the following:
   | { | } | \ | ->
-  | < | <= | > | >=
-  | == | /= | + | -
-  | * | `div` | ( | )
-  | = | ; | _ | |
+  | && | || | < | <=
+  | > | >= | == | /=
+  | + | - | * | `div`
+  | ( | ) | = | ;
+  | _ | | |  | 
 
 ===Comments===
 Single-line comments begin with --.There are no multiple-line comments in the grammar.
@@ -61,26 +62,28 @@ All other symbols are terminals.
   |  |  **|**  | ``\`` //ValueIdent// ``->`` //Exp// 
   |  |  **|**  | ``if`` //Exp// ``then`` //Exp// ``else`` //Exp// 
   |  |  **|**  | //Exp1// 
-  | //Exp1// | -> | //Exp1// ``<`` //Exp2// 
-  |  |  **|**  | //Exp1// ``<=`` //Exp2// 
-  |  |  **|**  | //Exp1// ``>`` //Exp2// 
-  |  |  **|**  | //Exp1// ``>=`` //Exp2// 
-  |  |  **|**  | //Exp1// ``==`` //Exp2// 
-  |  |  **|**  | //Exp1// ``/=`` //Exp2// 
+  | //Exp1// | -> | //Exp1// ``&&`` //Exp2// 
+  |  |  **|**  | //Exp1// ``||`` //Exp2// 
   |  |  **|**  | //Exp2// 
-  | //Exp2// | -> | //Exp2// ``+`` //Exp3// 
-  |  |  **|**  | //Exp2// ``-`` //Exp3// 
+  | //Exp2// | -> | //Exp2// ``<`` //Exp3// 
+  |  |  **|**  | //Exp2// ``<=`` //Exp3// 
+  |  |  **|**  | //Exp2// ``>`` //Exp3// 
+  |  |  **|**  | //Exp2// ``>=`` //Exp3// 
+  |  |  **|**  | //Exp2// ``==`` //Exp3// 
+  |  |  **|**  | //Exp2// ``/=`` //Exp3// 
   |  |  **|**  | //Exp3// 
-  | //Exp3// | -> | //Exp3// ``*`` //Exp4// 
-  |  |  **|**  | //Exp3// ```div``` //Exp4// 
+  | //Exp3// | -> | //Exp3// ``+`` //Exp4// 
+  |  |  **|**  | //Exp3// ``-`` //Exp4// 
   |  |  **|**  | //Exp4// 
+  | //Exp4// | -> | //Exp4// ``*`` //Exp5// 
+  |  |  **|**  | //Exp4// ```div``` //Exp5// 
+  |  |  **|**  | //Exp5// 
   | //Exp10// | -> | //Exp10// //Exp11// 
   |  |  **|**  | //Exp11// 
   | //Exp11// | -> | //Integer// 
   |  |  **|**  | //ValueIdent// 
   |  |  **|**  | //TypeIdent// 
   |  |  **|**  | ``(`` //Exp// ``)`` 
-  | //Exp4// | -> | //Exp5// 
   | //Exp5// | -> | //Exp6// 
   | //Exp6// | -> | //Exp7// 
   | //Exp7// | -> | //Exp8// 

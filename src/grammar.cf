@@ -14,17 +14,20 @@ ECase. Exp ::= "case" Exp "of" "{" [CasePart] "}" ;
 ELambda. Exp ::= "\\" ValueIdent "->" Exp ;
 EIf. Exp ::= "if" Exp "then" Exp "else" Exp ;
 
-ELT. Exp1 ::= Exp1 "<" Exp2 ;
-ELTE. Exp1 ::= Exp1 "<=" Exp2 ;
-EGT. Exp1 ::= Exp1 ">" Exp2 ;
-EGTE. Exp1 ::= Exp1 ">=" Exp2 ;
-EEq. Exp1 ::= Exp1 "==" Exp2 ;
-ENEq. Exp1 ::= Exp1 "/=" Exp2 ;
+EAnd. Exp1 ::= Exp1 "&&" Exp2 ;
+EOr. Exp1 ::= Exp1 "||" Exp2 ;
 
-EAdd.	Exp2	::=	Exp2	"+"	Exp3	;
-ESub.	Exp2	::=	Exp2	"-"	Exp3	;
-EMul.	Exp3	::=	Exp3	"*"	Exp4	;
-EDiv.	Exp3	::=	Exp3	"`div`"	Exp4	;
+ELT. Exp2 ::= Exp2 "<" Exp3 ;
+ELTE. Exp2 ::= Exp2 "<=" Exp3 ;
+EGT. Exp2 ::= Exp2 ">" Exp3 ;
+EGTE. Exp2 ::= Exp2 ">=" Exp3 ;
+EEq. Exp2 ::= Exp2 "==" Exp3 ;
+ENEq. Exp2 ::= Exp2 "/=" Exp3 ;
+
+EAdd.	Exp3	::=	Exp3	"+"	Exp4	;
+ESub.	Exp3	::=	Exp3	"-"	Exp4	;
+EMul.	Exp4	::=	Exp4	"*"	Exp5	;
+EDiv.	Exp4	::=	Exp4	"`div`"	Exp5	;
 
 EApp. Exp10 ::= Exp10 Exp11;
 
