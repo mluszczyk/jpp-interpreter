@@ -47,6 +47,7 @@ transDecl :: Decl -> Result
 transDecl x = case x of
   DValue valueident valueidents exp -> failure x
   DValueWhere valueident valueidents exp decls -> failure x
+  DType valueident typeref -> failure x
   DData typedecl variants -> failure x
 transCasePart :: CasePart -> Result
 transCasePart x = case x of
@@ -62,6 +63,7 @@ transTypeDecl x = case x of
 transTypeRef :: TypeRef -> Result
 transTypeRef x = case x of
   TRVariant typeident typerefs -> failure x
+  TRFunc typeref1 typeref2 -> failure x
   TRValue valueident -> failure x
   TRSimpleVariant typeident -> failure x
 transVariant :: Variant -> Result

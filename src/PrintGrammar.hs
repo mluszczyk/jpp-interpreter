@@ -124,6 +124,7 @@ instance Print Decl where
   prt i e = case e of
     DValue valueident valueidents exp -> prPrec i 0 (concatD [prt 0 valueident, prt 0 valueidents, doc (showString "="), prt 0 exp])
     DValueWhere valueident valueidents exp decls -> prPrec i 0 (concatD [prt 0 valueident, prt 0 valueidents, doc (showString "="), prt 0 exp, doc (showString "where"), doc (showString "{"), prt 0 decls, doc (showString "}")])
+    DType valueident typeref -> prPrec i 0 (concatD [prt 0 valueident, doc (showString "::"), prt 0 typeref])
     DData typedecl variants -> prPrec i 0 (concatD [doc (showString "data"), prt 0 typedecl, doc (showString "="), prt 0 variants])
   prtList _ [] = (concatD [])
   prtList _ [x] = (concatD [prt 0 x])
@@ -148,8 +149,9 @@ instance Print TypeDecl where
 instance Print TypeRef where
   prt i e = case e of
     TRVariant typeident typerefs -> prPrec i 0 (concatD [prt 0 typeident, prt 1 typerefs])
-    TRValue valueident -> prPrec i 1 (concatD [prt 0 valueident])
-    TRSimpleVariant typeident -> prPrec i 1 (concatD [prt 0 typeident])
+    TRFunc typeref1 typeref2 -> prPrec i 1 (concatD [prt 1 typeref1, doc (showString "->"), prt 2 typeref2])
+    TRValue valueident -> prPrec i 2 (concatD [prt 0 valueident])
+    TRSimpleVariant typeident -> prPrec i 2 (concatD [prt 0 typeident])
   prtList 1 [x] = (concatD [prt 1 x])
   prtList 1 (x:xs) = (concatD [prt 1 x, prt 1 xs])
 instance Print Variant where

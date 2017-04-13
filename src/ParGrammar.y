@@ -31,6 +31,7 @@ import ErrM
 %name pListValueIdent ListValueIdent
 %name pTypeRef TypeRef
 %name pTypeRef1 TypeRef1
+%name pTypeRef2 TypeRef2
 %name pListTypeRef1 ListTypeRef1
 %name pVariant Variant
 %name pListIdent ListIdent
@@ -48,29 +49,30 @@ import ErrM
   '-' { PT _ (TS _ 6) }
   '->' { PT _ (TS _ 7) }
   '/=' { PT _ (TS _ 8) }
-  ';' { PT _ (TS _ 9) }
-  '<' { PT _ (TS _ 10) }
-  '<=' { PT _ (TS _ 11) }
-  '=' { PT _ (TS _ 12) }
-  '==' { PT _ (TS _ 13) }
-  '>' { PT _ (TS _ 14) }
-  '>=' { PT _ (TS _ 15) }
-  '\\' { PT _ (TS _ 16) }
-  '_' { PT _ (TS _ 17) }
-  '`div`' { PT _ (TS _ 18) }
-  'case' { PT _ (TS _ 19) }
-  'data' { PT _ (TS _ 20) }
-  'else' { PT _ (TS _ 21) }
-  'if' { PT _ (TS _ 22) }
-  'in' { PT _ (TS _ 23) }
-  'let' { PT _ (TS _ 24) }
-  'of' { PT _ (TS _ 25) }
-  'then' { PT _ (TS _ 26) }
-  'where' { PT _ (TS _ 27) }
-  '{' { PT _ (TS _ 28) }
-  '|' { PT _ (TS _ 29) }
-  '||' { PT _ (TS _ 30) }
-  '}' { PT _ (TS _ 31) }
+  '::' { PT _ (TS _ 9) }
+  ';' { PT _ (TS _ 10) }
+  '<' { PT _ (TS _ 11) }
+  '<=' { PT _ (TS _ 12) }
+  '=' { PT _ (TS _ 13) }
+  '==' { PT _ (TS _ 14) }
+  '>' { PT _ (TS _ 15) }
+  '>=' { PT _ (TS _ 16) }
+  '\\' { PT _ (TS _ 17) }
+  '_' { PT _ (TS _ 18) }
+  '`div`' { PT _ (TS _ 19) }
+  'case' { PT _ (TS _ 20) }
+  'data' { PT _ (TS _ 21) }
+  'else' { PT _ (TS _ 22) }
+  'if' { PT _ (TS _ 23) }
+  'in' { PT _ (TS _ 24) }
+  'let' { PT _ (TS _ 25) }
+  'of' { PT _ (TS _ 26) }
+  'then' { PT _ (TS _ 27) }
+  'where' { PT _ (TS _ 28) }
+  '{' { PT _ (TS _ 29) }
+  '|' { PT _ (TS _ 30) }
+  '||' { PT _ (TS _ 31) }
+  '}' { PT _ (TS _ 32) }
 
 L_integ  { PT _ (TI $$) }
 L_ident  { PT _ (TV $$) }
@@ -133,6 +135,7 @@ Exp9 : Exp10 { $1 }
 Decl :: { Decl }
 Decl : ValueIdent ListValueIdent '=' Exp { AbsGrammar.DValue $1 $2 $4 }
      | ValueIdent ListValueIdent '=' Exp 'where' '{' ListDecl '}' { AbsGrammar.DValueWhere $1 $2 $4 $7 }
+     | ValueIdent '::' TypeRef { AbsGrammar.DType $1 $3 }
      | 'data' TypeDecl '=' ListVariant { AbsGrammar.DData $2 $4 }
 CasePart :: { CasePart }
 CasePart : Pattern '->' Exp { AbsGrammar.CaseP $1 $3 }
@@ -159,7 +162,10 @@ TypeRef :: { TypeRef }
 TypeRef : TypeIdent ListTypeRef1 { AbsGrammar.TRVariant $1 $2 }
         | TypeRef1 { $1 }
 TypeRef1 :: { TypeRef }
-TypeRef1 : ValueIdent { AbsGrammar.TRValue $1 }
+TypeRef1 : TypeRef1 '->' TypeRef2 { AbsGrammar.TRFunc $1 $3 }
+         | TypeRef2 { $1 }
+TypeRef2 :: { TypeRef }
+TypeRef2 : ValueIdent { AbsGrammar.TRValue $1 }
          | TypeIdent { AbsGrammar.TRSimpleVariant $1 }
          | '(' TypeRef ')' { $2 }
 ListTypeRef1 :: { [TypeRef] }

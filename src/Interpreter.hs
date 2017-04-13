@@ -62,6 +62,8 @@ transDecl evalEnv envStub (DData declIgnored variants) =
     go env' (SimpleVar (TypeIdent name)) =
       Ok $ insert name (Ok $ transConstructor name [] []) env'
 
+transDecl _ envStub (DType _ _) = Ok envStub
+
 transDecls :: Env -> [Decl] -> Err Env
 transDecls env decls = do
     rec env' <- foldM (transDecl env') env decls

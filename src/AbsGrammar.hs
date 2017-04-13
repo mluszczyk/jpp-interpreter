@@ -40,6 +40,7 @@ data Exp
 data Decl
     = DValue ValueIdent [ValueIdent] Exp
     | DValueWhere ValueIdent [ValueIdent] Exp [Decl]
+    | DType ValueIdent TypeRef
     | DData TypeDecl [Variant]
   deriving (Eq, Ord, Show, Read)
 
@@ -55,6 +56,7 @@ data TypeDecl = TDecl TypeIdent [ValueIdent]
 
 data TypeRef
     = TRVariant TypeIdent [TypeRef]
+    | TRFunc TypeRef TypeRef
     | TRValue ValueIdent
     | TRSimpleVariant TypeIdent
   deriving (Eq, Ord, Show, Read)

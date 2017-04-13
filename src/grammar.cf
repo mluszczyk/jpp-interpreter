@@ -38,6 +38,7 @@ coercions	Exp	11	;
 
 DValue. Decl ::= ValueIdent [ValueIdent] "=" Exp ;
 DValueWhere. Decl ::= ValueIdent [ValueIdent] "=" Exp "where" "{" [Decl] "}" ;
+DType. Decl ::= ValueIdent "::" TypeRef ;
 DData. Decl ::= "data" TypeDecl "=" [Variant] ;
 
 CaseP. CasePart ::= Pattern "->" Exp;
@@ -54,9 +55,10 @@ separator ValueIdent "" ;
 -- e.g. `Blah a b c`
 
 TRVariant. TypeRef ::= TypeIdent [TypeRef1] ;
-TRValue. TypeRef1 ::= ValueIdent ;
-TRSimpleVariant. TypeRef1 ::= TypeIdent ;
-coercions TypeRef 1;
+TRFunc. TypeRef1 ::= TypeRef1 "->" TypeRef2 ;
+TRValue. TypeRef2 ::= ValueIdent ;
+TRSimpleVariant. TypeRef2 ::= TypeIdent ;
+coercions TypeRef 2;
 separator nonempty TypeRef1 "" ;
 
 -- e.g. `Blah (Blah a b c) [Blah] ;
