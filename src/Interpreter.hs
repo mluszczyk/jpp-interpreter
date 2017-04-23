@@ -9,16 +9,16 @@ import Control.Monad.Fix
 import Data.Map as M
 import AbsGrammar
 import ErrM
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 type Result = Err Value
 
 data Value = Const Integer | Func (Value -> Result) |
     Variant String [Value]
 
 instance Show Value where
-  show (Const n) = "Const " ++ (show n)
+  show (Const n) = "Const " ++ show n
   show (Func f) = "Func"
-  show (Variant s d) = ("Variant " ++ s ++ (show d))
+  show (Variant s d) = "Variant " ++ s ++ show d
 
 type Env = M.Map String (Err Value)
 
@@ -28,7 +28,7 @@ arithm op env exp1 exp2 = do
   v2 <- transExp env exp2
   case (v1, v2) of 
     (Const i1, Const i2) -> Ok $ Const (i1 `op` i2)
-    _ -> Bad $ "arithmetic operations only supported for consts"
+    _ -> Bad "arithmetic operations only supported for consts"
 
 intCompare :: (Integer -> Integer -> Bool) -> Env -> Exp -> Exp -> Result
 intCompare op env exp1 exp2 = do
@@ -36,9 +36,9 @@ intCompare op env exp1 exp2 = do
   v2 <- transExp env exp2
   case (v1, v2) of 
     (Const i1, Const i2) -> Ok $ boolToLang (i1 `op` i2)
-    _ -> Bad $ "comparisons only supported for consts"
+    _ -> Bad "comparisons only supported for consts"
 
-instance MonadFix (Err) where
+instance MonadFix Err where
     mfix f = let a = f (unRight a) in a
              where unRight (Ok x) = x
                    unRight (Bad _) = errorWithoutStackTrace "mfix Either: Left"
@@ -50,8 +50,7 @@ transConstructor name (arg:rest) values =
 
 transDecl :: Env -> Env -> Decl -> Err Env
 transDecl evalEnv envStub (DValue (ValueIdent name) argsIdents exp) =
-  let composeLambdas argIdent partialExp = ELambda argIdent partialExp in
-  let func = Prelude.foldr composeLambdas exp argsIdents
+  let func = Prelude.foldr ELambda exp argsIdents
   in Ok $ insert name (transExp evalEnv func) envStub
 
 transDecl evalEnv envStub (DData declIgnored variants) =
@@ -72,18 +71,17 @@ transDecls env decls = do
 valsEqual :: Value -> Value -> Err Bool
 valsEqual val1 val2 = 
   case (val1, val2) of
-    (Const i1, Const i2) -> Ok $ (i1 == i2)
+    (Const i1, Const i2) -> Ok (i1 == i2)
     (Variant s1 d1, Variant s2 d2) -> do
-      blist <- mapM (uncurry valsEqual) (zip d1 d2)
-      return $ s1 == s2 && (length d1) == (length d2) && (all id blist) 
-    (_, _) -> Bad $ "uncomparable types"
+      blist <- zipWithM valsEqual d1 d2
+      return $ s1 == s2 && length d1 == length d2 && and blist
+    (_, _) -> Bad "uncomparable types"
 
 isEqual :: Env -> Exp -> Exp -> Err Bool
 isEqual env exp1 exp2 = do
   val1 <- transExp env exp1
   val2 <- transExp env exp2
-  eq <- valsEqual val1 val2
-  return $ eq
+  valsEqual val1 val2
 
 transExp :: Env -> Exp -> Result
 transExp env x = case x of
@@ -109,28 +107,23 @@ transExp env x = case x of
     return $ boolToLang $ not eq
  
   EAnd exp1 exp2 -> do
-    val1 <- transExp env exp1
-    val2 <- transExp env exp2
-    b1 <- boolFromValue val1
-    b2 <- boolFromValue val2
+    b1 <- transBoolExp env exp1
+    b2 <- transBoolExp env exp2
     return $ boolToLang $ b1 && b2
 
   EOr exp1 exp2 -> do
-    val1 <- transExp env exp1
-    val2 <- transExp env exp2
-    b1 <- boolFromValue val1
-    b2 <- boolFromValue val2
+    b1 <- transBoolExp env exp1
+    b2 <- transBoolExp env exp2
     return $ boolToLang $ b1 || b2
 
-  EInt integer -> Ok $ Const $ integer
+  EInt integer -> Ok $ Const integer
   ELet decls exp -> do
     env' <- transDecls env decls
-    v1 <- transExp env' exp
-    return v1
+    transExp env' exp
   EVarValue (ValueIdent ident) ->
-    maybe (Bad $ "identifier " ++ ident ++ " unset") id (M.lookup ident env)
+    fromMaybe (Bad $ "identifier " ++ ident ++ " unset") (M.lookup ident env)
   EVarType (TypeIdent ident) ->
-    maybe (Bad $ "identifier " ++ ident ++ " unset") id (M.lookup ident env)
+    fromMaybe (Bad $ "identifier " ++ ident ++ " unset") (M.lookup ident env)
   EIf exp1 exp2 exp3 -> do
     v1 <- transExp env exp1
     b <- boolFromValue v1
@@ -153,15 +146,15 @@ transExp env x = case x of
     let 
       matchSubpatterns :: Env -> [Value] -> [Pattern] -> Maybe (Err Env)
       matchSubpatterns env' values patterns =
-        if (length values) /= (length patterns)
-          then Just $ Bad $ "number of variant args does not match"
+        if length values /= length patterns
+          then Just $ Bad "number of variant args does not match"
           else Prelude.foldl go (Just $ Ok env') (zip values patterns) 
             where 
-              go :: (Maybe (Err Env)) -> (Value, Pattern) -> (Maybe (Err Env))
+              go :: Maybe (Err Env) -> (Value, Pattern) -> Maybe (Err Env)
               go Nothing _ = Nothing
-              go (Just (Bad  s)) _ = Just $ Bad $ s
-              go (Just (Ok env'')) (value, pattern) =
-                matchPattern env'' value pattern
+              go (Just (Bad  s)) _ = Just $ Bad s
+              go (Just (Ok env'')) (value, pat) =
+                matchPattern env'' value pat
 
       matchPattern :: Env -> Value -> Pattern -> Maybe (Err Env)
       matchPattern env' value PAny = Just (Ok env')
@@ -174,17 +167,17 @@ transExp env x = case x of
               then matchSubpatterns env' variantData patterns
               else Nothing
           _ -> Just $ Bad $ 
-            "you cannot match case with non variant value" ++ (show value)
+            "you cannot match case with non variant value" ++ show value
 
       matchCasePart :: Value -> CasePart -> Maybe Result
-      matchCasePart value (CaseP pattern thenExp) = 
-        case matchPattern env value pattern of
+      matchCasePart value (CaseP pat thenExp) = 
+        case matchPattern env value pat of
           Just (Ok env') -> Just $ transExp env' thenExp
           Just (Bad b) -> Just (Bad b)
           Nothing -> Nothing
     in do
       val <- transExp env exp
-      let matches = catMaybes $ Prelude.map (matchCasePart val) caseParts
+      let matches = Data.Maybe.mapMaybe (matchCasePart val) caseParts
       case matches of 
         [] -> Bad "exhausted pattern matching"
         (a:_) -> a
@@ -193,6 +186,11 @@ boolFromValue :: Value -> Err Bool
 boolFromValue v@(Variant "True" []) = Ok True
 boolFromValue v@(Variant "False" []) = Ok False
 boolFromValue _ = Bad "expected boolean"
+
+transBoolExp :: Env -> Exp -> Err Bool
+transBoolExp env exp1 = do
+  val1 <- transExp env exp1
+  boolFromValue val1
 
 trueVariant = Var (TypeIdent "True") []
 falseVariant = Var (TypeIdent "False") []
@@ -211,5 +209,4 @@ interpret :: Program -> Result
 interpret (Program decls) = do
   builtinEnv <- builtins
   env <- transDecls builtinEnv decls
-  val <- transExp env (EVarValue (ValueIdent "main"))
-  return val
+  transExp env (EVarValue (ValueIdent "main"))
