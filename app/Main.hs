@@ -51,6 +51,7 @@ run v p s = do
   putStrLn "parsing file"
   tree <- parse v p s
   let sTree = simplify tree
+  test sTree
   putStrLn $ show (interpretWithBuiltins sBuiltinsTree sTree)
   exitSuccess
 
