@@ -205,8 +205,8 @@ builtins =
     DData (TDecl (TypeIdent "Bool") []) [trueVariant, falseVariant]
   ]
 
-interpret :: Program -> Result
-interpret (Program decls) = do
+interpretWithBuiltins :: Program -> Program -> Result
+interpretWithBuiltins _ (Program decls) = do
   builtinEnv <- builtins
   env <- transDecls builtinEnv decls
   transExp env (EVarValue (ValueIdent "main"))
