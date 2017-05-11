@@ -18,6 +18,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Lib
                        AbsGrammar
+                       SimpleGrammar
                        LexGrammar
                        ParGrammar
                        PrintGrammar
@@ -25,6 +26,7 @@ library
                        ErrM
                        Interpreter
                        Reconstruction
+                       Simplifier
   build-depends:       base >= 4.7 && < 5
                      , BNFC
                      , array

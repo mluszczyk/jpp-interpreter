@@ -13,6 +13,7 @@ import PrintGrammar
 import AbsGrammar
 
 import Reconstruction ( test )
+import Simplifier ( simplify )
 
 import ErrM
 
@@ -46,9 +47,11 @@ run v p s = do
   builtinsFile <- readFile builtinsPath
   putStrLn "parsing builtins"
   builtinsTree <- parse v p builtinsFile
+  let sBuiltinsTree = simplify builtinsTree
   putStrLn "parsing file"
   tree <- parse v p s
-  putStrLn $ show (interpretWithBuiltins builtinsTree tree)
+  let sTree = simplify tree
+  putStrLn $ show (interpretWithBuiltins sBuiltinsTree sTree)
   exitSuccess
 
 -- showTree :: (Show a, Print a) => Int -> a -> IO ()

@@ -7,7 +7,7 @@ import Debug.Trace
 import Control.Monad
 import Control.Monad.Fix
 import Data.Map as M
-import AbsGrammar
+import SimpleGrammar
 import ErrM
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 type Result = Err Value
@@ -21,22 +21,6 @@ instance Show Value where
   show (Variant s d) = "Variant " ++ s ++ show d
 
 type Env = M.Map String (Err Value)
-
-arithm :: (Integer -> Integer -> Integer) -> Env -> Exp -> Exp -> Result
-arithm op env exp1 exp2 = do
-  v1 <- transExp env exp1
-  v2 <- transExp env exp2
-  case (v1, v2) of 
-    (Const i1, Const i2) -> Ok $ Const (i1 `op` i2)
-    _ -> Bad "arithmetic operations only supported for consts"
-
-intCompare :: (Integer -> Integer -> Bool) -> Env -> Exp -> Exp -> Result
-intCompare op env exp1 exp2 = do
-  v1 <- transExp env exp1
-  v2 <- transExp env exp2
-  case (v1, v2) of 
-    (Const i1, Const i2) -> Ok $ boolToLang (i1 `op` i2)
-    _ -> Bad "comparisons only supported for consts"
 
 instance MonadFix Err where
     mfix f = let a = f (unRight a) in a
@@ -58,8 +42,6 @@ transDecl evalEnv envStub (DData declIgnored variants) =
     go :: Env -> Variant -> Err Env
     go env' (Var (TypeIdent name) args) =
       Ok $ insert name (Ok $ transConstructor name args []) env'
-    go env' (SimpleVar (TypeIdent name)) =
-      Ok $ insert name (Ok $ transConstructor name [] []) env'
 
 transDecl _ envStub (DType _ _) = Ok envStub
 
@@ -77,45 +59,8 @@ valsEqual val1 val2 =
       return $ s1 == s2 && length d1 == length d2 && and blist
     (_, _) -> Bad "uncomparable types"
 
-isEqual :: Env -> Exp -> Exp -> Err Bool
-isEqual env exp1 exp2 = do
-  val1 <- transExp env exp1
-  val2 <- transExp env exp2
-  valsEqual val1 val2
-
 transExp :: Env -> Exp -> Result
 transExp env x = case x of
-  EAdd exp1 exp2 -> arithm (+) env exp1 exp2
-  ESub exp1 exp2 -> arithm (-) env exp1 exp2
-  EMul exp1 exp2 -> arithm (*) env exp1 exp2
-  EDiv exp1 exp2 -> do
-    v2 <- transExp env exp2
-    case v2 of
-      Const i2 | i2 == 0 -> Bad "division by 0"
-      _ -> arithm div env exp1 exp2
-
-  ELT exp1 exp2 -> intCompare (<) env exp1 exp2
-  ELTE exp1 exp2 -> intCompare (<=) env exp1 exp2
-  EGT exp1 exp2 -> intCompare (>) env exp1 exp2
-  EGTE exp1 exp2 -> intCompare (>=) env exp1 exp2
-
-  EEq exp1 exp2 -> do
-    eq <- isEqual env exp1 exp2
-    return $ boolToLang eq
-  ENEq exp1 exp2 -> do
-    eq <- isEqual env exp1 exp2
-    return $ boolToLang $ not eq
- 
-  EAnd exp1 exp2 -> do
-    b1 <- transBoolExp env exp1
-    b2 <- transBoolExp env exp2
-    return $ boolToLang $ b1 && b2
-
-  EOr exp1 exp2 -> do
-    b1 <- transBoolExp env exp1
-    b2 <- transBoolExp env exp2
-    return $ boolToLang $ b1 || b2
-
   EInt integer -> Ok $ Const integer
   ELet decls exp -> do
     env' <- transDecls env decls
@@ -124,13 +69,6 @@ transExp env x = case x of
     fromMaybe (Bad $ "identifier " ++ ident ++ " unset") (M.lookup ident env)
   EVarType (TypeIdent ident) ->
     fromMaybe (Bad $ "identifier " ++ ident ++ " unset") (M.lookup ident env)
-  EIf exp1 exp2 exp3 -> do
-    v1 <- transExp env exp1
-    b <- boolFromValue v1
-    if b then
-      transExp env exp2
-    else
-      transExp env exp3
   ELambda (ValueIdent ident) exp ->
     Ok (Func func) where
       func arg = transExp env' exp where
@@ -182,31 +120,52 @@ transExp env x = case x of
         [] -> Bad "exhausted pattern matching"
         (a:_) -> a
 
-boolFromValue :: Value -> Err Bool
-boolFromValue v@(Variant "True" []) = Ok True
-boolFromValue v@(Variant "False" []) = Ok False
-boolFromValue _ = Bad "expected boolean"
-
-transBoolExp :: Env -> Exp -> Err Bool
-transBoolExp env exp1 = do
-  val1 <- transExp env exp1
-  boolFromValue val1
-
-trueVariant = Var (TypeIdent "True") []
-falseVariant = Var (TypeIdent "False") []
-
-boolToLang :: Bool -> Value
-boolToLang False = Variant "False" []
-boolToLang True = Variant "True" []
-
-builtins :: Err Env
-builtins =
-  transDecls empty [
-    DData (TDecl (TypeIdent "Bool") []) [trueVariant, falseVariant]
+specialBuiltins :: Env
+specialBuiltins = fromList 
+  [ ("+", arithmBuiltin (+))
+  , ("-", arithmBuiltin (-))
+  , ("*", arithmBuiltin (*))
+  , ("`div`", division)
+  , ("==", boolBuiltin (==))
+  , ("/=", boolBuiltin (/=))
+  , ("<=", boolBuiltin (<=))
+  , ("<", boolBuiltin (<))
+  , (">=", boolBuiltin (>=))
+  , (">", boolBuiltin (>))
   ]
+  where
+    binaryIntFuncWrapper :: (Integer -> Integer -> Result) -> Result
+    binaryIntFuncWrapper func =
+      (Ok (Func (\v1 -> Ok $ Func (\v2 -> checkFunc v1 v2))))
+      where 
+        checkFunc (Const i1) (Const i2) = func i1 i2
+        checkFunc _ _ = Bad $ "unsupported non-integer argument for arithmetic operation"
+
+    division = binaryIntFuncWrapper foo
+      where 
+        foo _ i2 | i2 == 0 = Bad $ "division by 0"
+        foo i1 i2 = Ok $ Const (i1 `div` i2)
+  
+    arithmBuiltin :: (Integer -> Integer -> Integer) -> Result
+    arithmBuiltin op = binaryIntFuncWrapper foo
+      where
+        foo i1 i2 = Ok $ Const (i1 `op` i2)
+
+    boolBuiltin :: (Integer -> Integer -> Bool) -> Result
+    boolBuiltin op = binaryIntFuncWrapper foo
+      where 
+        foo i1 i2  = Ok $ boolToLang (i1 `op` i2)
+
+    boolToLang :: Bool -> Value
+    boolToLang False = Variant "False" []
+    boolToLang True = Variant "True" []
+
 
 interpretWithBuiltins :: Program -> Program -> Result
-interpretWithBuiltins _ (Program decls) = do
-  builtinEnv <- builtins
-  env <- transDecls builtinEnv decls
-  transExp env (EVarValue (ValueIdent "main"))
+interpretWithBuiltins (Program builtinsDecls) (Program programDecls) =
+    do
+      builtinEnv <- transDecls specialBuiltins builtinsDecls
+      transExp builtinEnv exp
+  where
+    exp = ELet programDecls (EVarValue (ValueIdent "main"))
+

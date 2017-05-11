@@ -14,7 +14,7 @@ import Control.Monad.State
 
 import qualified Text.PrettyPrint as PP
 
-import AbsGrammar
+import SimpleGrammar
 
 {-data Exp     =  EVar String
              |  ELit Lit
