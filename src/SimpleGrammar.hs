@@ -1,6 +1,6 @@
 module SimpleGrammar where
 
-data Program = Program [Decl] deriving (Eq, Ord, Show, Read)
+newtype Program = Program [Decl] deriving (Eq, Ord, Show, Read)
 
 newtype Ident = Ident String deriving (Eq, Ord, Show, Read)
 newtype TypeIdent = TypeIdent String deriving (Eq, Ord, Show, Read)

@@ -11,8 +11,7 @@ simplifyValueIdent (AG.ValueIdent name) = SG.ValueIdent name
 simplifyTypeIdent (AG.TypeIdent name) = SG.TypeIdent name
 
 simplifyDeclBlock :: [AG.Decl] -> [SG.Decl]
-simplifyDeclBlock decls =
-  map simplifyDecl decls
+simplifyDeclBlock = map simplifyDecl
 
 simplifyDecl :: AG.Decl -> SG.Decl
 simplifyDecl (AG.DValue name args exp) =
@@ -74,8 +73,8 @@ simplifyExp exp = case exp of
     map simplifyCasePart caseParts)
 
 simplifyCasePart :: AG.CasePart -> SG.CasePart
-simplifyCasePart (AG.CaseP pattern exp) =
-  SG.CaseP (simplifyPattern pattern) (simplifyExp exp)
+simplifyCasePart (AG.CaseP pat exp) =
+  SG.CaseP (simplifyPattern pat) (simplifyExp exp)
 
 simplifyPattern :: AG.Pattern -> SG.Pattern
 simplifyPattern (AG.PVariant typeIdent patterns) =

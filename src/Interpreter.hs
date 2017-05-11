@@ -128,7 +128,7 @@ specialBuiltins = fromList
   where
     binaryIntFuncWrapper :: (Integer -> Integer -> Result) -> Result
     binaryIntFuncWrapper func =
-      (Ok (Func (\r1 -> Ok $ Func (\r2 -> checkFunc r1 r2))))
+      Ok (Func (Ok . Func . checkFunc))
       where
         checkFunc r1 r2 =
           do
@@ -137,11 +137,11 @@ specialBuiltins = fromList
             checkIntFunc v1 v2
 
         checkIntFunc (Const i1) (Const i2) = func i1 i2
-        checkIntFunc _ _ = Bad $ "unsupported non-integer argument for arithmetic operation"
+        checkIntFunc _ _ = Bad "unsupported non-integer argument for arithmetic operation"
 
     division = binaryIntFuncWrapper foo
       where 
-        foo _ i2 | i2 == 0 = Bad $ "division by 0"
+        foo _ i2 | i2 == 0 = Bad "division by 0"
         foo i1 i2 = Ok $ Const (i1 `div` i2)
   
     arithmBuiltin :: (Integer -> Integer -> Integer) -> Result
