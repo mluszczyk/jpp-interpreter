@@ -12,8 +12,8 @@ import ErrM
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 type Result = Err Value
 
-data Value = Const Integer | Func (Value -> Result) |
-    Variant String [Value]
+data Value = Const Integer | Func (Result -> Result) |
+    Variant String [Result]
 
 instance Show Value where
   show (Const n) = "Const " ++ show n
@@ -27,10 +27,10 @@ instance MonadFix Err where
              where unRight (Ok x) = x
                    unRight (Bad _) = errorWithoutStackTrace "mfix Either: Left"
 
-transConstructor :: String -> [a] -> [Value] -> Value
-transConstructor name [] values = Variant name values
-transConstructor name (arg:rest) values =
-  Func (\v -> Ok $ transConstructor name rest (values ++ [v]))
+transConstructor :: String -> [a] -> [Result] -> Value
+transConstructor name [] results = Variant name results
+transConstructor name (arg:rest) results =
+  Func (\r -> Ok $ transConstructor name rest (results ++ [r]))
 
 transDecl :: Env -> Env -> Decl -> Err Env
 transDecl evalEnv envStub (DValue (ValueIdent name) argsIdents exp) =
@@ -50,15 +50,6 @@ transDecls env decls = do
     rec env' <- foldM (transDecl env') env decls
     return env'
 
-valsEqual :: Value -> Value -> Err Bool
-valsEqual val1 val2 = 
-  case (val1, val2) of
-    (Const i1, Const i2) -> Ok (i1 == i2)
-    (Variant s1 d1, Variant s2 d2) -> do
-      blist <- zipWithM valsEqual d1 d2
-      return $ s1 == s2 && length d1 == length d2 && and blist
-    (_, _) -> Bad "uncomparable types"
-
 transExp :: Env -> Exp -> Result
 transExp env x = case x of
   EInt integer -> Ok $ Const integer
@@ -72,27 +63,28 @@ transExp env x = case x of
   ELambda (ValueIdent ident) exp ->
     Ok (Func func) where
       func arg = transExp env' exp where
-        env' = insert ident (Ok arg) env
+        env' = insert ident arg env
   EApp func arg -> do
     funcVal <- transExp env func
     case funcVal of
       Func f -> do
-        val <- transExp env arg
-        f val
+        let argRes = transExp env arg
+        f argRes
       _ -> Bad "cannot apply to a constant"
   ECase exp caseParts ->
     let 
-      matchSubpatterns :: Env -> [Value] -> [Pattern] -> Maybe (Err Env)
-      matchSubpatterns env' values patterns =
-        if length values /= length patterns
+      matchSubpatterns :: Env -> [Result] -> [Pattern] -> Maybe (Err Env)
+      matchSubpatterns env' results patterns =
+        if length results /= length patterns
           then Just $ Bad "number of variant args does not match"
-          else Prelude.foldl go (Just $ Ok env') (zip values patterns) 
+          else Prelude.foldl go (Just $ Ok env') (zip results patterns) 
             where 
-              go :: Maybe (Err Env) -> (Value, Pattern) -> Maybe (Err Env)
+              go :: Maybe (Err Env) -> (Result, Pattern) -> Maybe (Err Env)
               go Nothing _ = Nothing
               go (Just (Bad  s)) _ = Just $ Bad s
-              go (Just (Ok env'')) (value, pat) =
-                matchPattern env'' value pat
+              go (Just (Ok env'')) (result, pat) = case result of
+                Ok value -> matchPattern env'' value pat
+                Bad s -> Just (Bad s)
 
       matchPattern :: Env -> Value -> Pattern -> Maybe (Err Env)
       matchPattern env' value PAny = Just (Ok env')
@@ -136,10 +128,16 @@ specialBuiltins = fromList
   where
     binaryIntFuncWrapper :: (Integer -> Integer -> Result) -> Result
     binaryIntFuncWrapper func =
-      (Ok (Func (\v1 -> Ok $ Func (\v2 -> checkFunc v1 v2))))
-      where 
-        checkFunc (Const i1) (Const i2) = func i1 i2
-        checkFunc _ _ = Bad $ "unsupported non-integer argument for arithmetic operation"
+      (Ok (Func (\r1 -> Ok $ Func (\r2 -> checkFunc r1 r2))))
+      where
+        checkFunc r1 r2 =
+          do
+            v1 <- r1
+            v2 <- r2
+            checkIntFunc v1 v2
+
+        checkIntFunc (Const i1) (Const i2) = func i1 i2
+        checkIntFunc _ _ = Bad $ "unsupported non-integer argument for arithmetic operation"
 
     division = binaryIntFuncWrapper foo
       where 
