@@ -13,6 +13,8 @@ import SkelGrammar
 import PrintGrammar
 import AbsGrammar
 
+import Reconstruction ( test )
+
 
 
 
@@ -39,6 +41,7 @@ run v p s = let ts = myLLexer s in case p ts of
                           exitFailure
            Ok  tree -> do putStrLn "\nParse Successful!"
                           showTree v tree
+                          test tree
                           putStrLn $ show (interpret tree)
                           exitSuccess
 
