@@ -33,14 +33,14 @@ transConstructor name (arg:rest) results =
   Func (\r -> Ok $ transConstructor name rest (results ++ [r]))
 
 transDecl :: Env -> Env -> Decl -> Err Env
-transDecl evalEnv envStub (DValue (ValueIdent name) argsIdents exp) =
+transDecl evalEnv envStub (DValue (Ident name) argsIdents exp) =
   let func = Prelude.foldr ELambda exp argsIdents
   in Ok $ insert name (transExp evalEnv func) envStub
 
 transDecl evalEnv envStub (DData declIgnored variants) =
   foldM go envStub variants where
     go :: Env -> Variant -> Err Env
-    go env' (Var (TypeIdent name) args) =
+    go env' (Var (Ident name) args) =
       Ok $ insert name (Ok $ transConstructor name args []) env'
 
 transDecl _ envStub (DType _ _) = Ok envStub
@@ -56,11 +56,9 @@ transExp env x = case x of
   ELet decls exp -> do
     env' <- transDecls env decls
     transExp env' exp
-  EVarValue (ValueIdent ident) ->
+  EVar (Ident ident) ->
     fromMaybe (Bad $ "identifier " ++ ident ++ " unset") (M.lookup ident env)
-  EVarType (TypeIdent ident) ->
-    fromMaybe (Bad $ "identifier " ++ ident ++ " unset") (M.lookup ident env)
-  ELambda (ValueIdent ident) exp ->
+  ELambda (Ident ident) exp ->
     Ok (Func func) where
       func arg = transExp env' exp where
         env' = insert ident arg env
@@ -88,9 +86,9 @@ transExp env x = case x of
 
       matchPattern :: Env -> Value -> Pattern -> Maybe (Err Env)
       matchPattern env' value PAny = Just (Ok env')
-      matchPattern env' value (PValue (ValueIdent str)) =
+      matchPattern env' value (PValue (Ident str)) =
         Just $ Ok $ insert str (Ok value) env'
-      matchPattern env' value (PVariant (TypeIdent expectedName) patterns) =
+      matchPattern env' value (PVariant (Ident expectedName) patterns) =
         case value of
           Variant variantName variantData -> 
             if variantName == expectedName
@@ -165,5 +163,5 @@ interpretWithBuiltins (Program builtinsDecls) (Program programDecls) =
       builtinEnv <- transDecls specialBuiltins builtinsDecls
       transExp builtinEnv exp
   where
-    exp = ELet programDecls (EVarValue (ValueIdent "main"))
+    exp = ELet programDecls (EVar (Ident "main"))
 

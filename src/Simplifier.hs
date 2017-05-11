@@ -7,8 +7,8 @@ simplify :: AG.Program -> SG.Program
 simplify (AG.Program decls) =
   SG.Program $ simplifyDeclBlock decls
 
-simplifyValueIdent (AG.ValueIdent name) = SG.ValueIdent name
-simplifyTypeIdent (AG.TypeIdent name) = SG.TypeIdent name
+simplifyValueIdent (AG.ValueIdent name) = SG.Ident name
+simplifyTypeIdent (AG.TypeIdent name) = SG.Ident name
 
 simplifyDeclBlock :: [AG.Decl] -> [SG.Decl]
 simplifyDeclBlock = map simplifyDecl
@@ -37,7 +37,7 @@ simplifyTypeRef (AG.TRValue ident) = SG.TRValue (simplifyValueIdent ident)
 
 unaryOperation :: String -> AG.Exp -> SG.Exp
 unaryOperation s e1 =
-  SG.EApp (SG.EVarValue (SG.ValueIdent s)) (simplifyExp e1)
+  SG.EApp (SG.EVar (SG.Ident s)) (simplifyExp e1)
 
 binaryOperation :: String -> AG.Exp -> AG.Exp -> SG.Exp
 binaryOperation s e1 e2 =
@@ -65,8 +65,8 @@ simplifyExp exp = case exp of
 
   AG.EInt integer -> SG.EInt integer
   AG.ELet decls exp -> SG.ELet (simplifyDeclBlock decls) (simplifyExp exp)
-  AG.EVarValue name -> SG.EVarValue (simplifyValueIdent name)
-  AG.EVarType name -> SG.EVarType (simplifyTypeIdent name)
+  AG.EVarValue name -> SG.EVar (simplifyValueIdent name)
+  AG.EVarType name -> SG.EVar (simplifyTypeIdent name)
   AG.ELambda value exp -> SG.ELambda (simplifyValueIdent value) (simplifyExp exp)
   AG.EApp exp1 exp2 -> SG.EApp (simplifyExp exp1) (simplifyExp exp2)
   AG.ECase exp caseParts -> SG.ECase (simplifyExp exp) (

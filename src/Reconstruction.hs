@@ -127,7 +127,7 @@ tiLit :: Lit -> TI (Subst, Type)
 tiLit (LInt _)   =  return (nullSubst, TInt)
 
 ti        ::  TypeEnv -> Exp -> TI (Subst, Type)
-ti (TypeEnv env) (EVarValue (ValueIdent ident)) = 
+ti (TypeEnv env) (EVar (Ident ident)) = 
     case Map.lookup ident env of
        Nothing     ->  throwError $ "unbound variable: " ++ ident
        Just sigma  ->  do  t <- instantiate sigma
@@ -135,7 +135,7 @@ ti (TypeEnv env) (EVarValue (ValueIdent ident)) =
 
 ti _ (EInt integer) = tiLit (LInt integer)
 
-ti env (ELambda (ValueIdent n) e) =
+ti env (ELambda (Ident n) e) =
     do  tv <- newTyVar "a"
         let TypeEnv env' = remove env n
             env'' = TypeEnv (env' `Map.union` (Map.singleton n (Scheme [] tv)))
@@ -153,7 +153,7 @@ ti env exp@(EApp e1 e2) =
 ti env (ELet decls e) =
     case decls of
     [] -> ti env e
-    [DValue (ValueIdent x) _ e1] -> 
+    [DValue (Ident x) _ e1] -> 
         do  (s1, t1) <- ti env e1
             let TypeEnv env' = remove env x
                 t' = generalize (apply s1 env) t1
@@ -200,7 +200,7 @@ testExp e =
 getMain :: Program -> Maybe Exp
 getMain (Program declsList) = msum (map go declsList)
     where
-        go (DValue (ValueIdent name) _ e) = 
+        go (DValue (Ident name) _ e) = 
             if name == "main" then Just e else Nothing
         go _ = Nothing
 
