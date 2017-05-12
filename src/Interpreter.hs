@@ -25,8 +25,8 @@ transConstructor name (_:rest) results =
   Func (\r -> Ok $ transConstructor name rest (results ++ [r]))
 
 transDecl :: Env -> Env -> Decl -> Err Env
-transDecl evalEnv envStub (DValue (Ident name) exp) =
-  Ok $ insert name (transExp evalEnv exp) envStub
+transDecl evalEnv envStub (DValue (Ident name) expr) =
+  Ok $ insert name (transExp evalEnv expr) envStub
 
 transDecl _ envStub (DData _ variants) =
   foldM go envStub variants where
@@ -44,14 +44,14 @@ transDecls env decls = do
 transExp :: Env -> Exp -> Result
 transExp env x = case x of
   EInt integer -> Ok $ Const integer
-  ELet decls exp -> do
+  ELet decls expr -> do
     env' <- transDecls env decls
-    transExp env' exp
+    transExp env' expr
   EVar (Ident ident) ->
     fromMaybe (Bad $ "identifier " ++ ident ++ " unset") (M.lookup ident env)
-  ELambda (Ident ident) exp ->
+  ELambda (Ident ident) expr ->
     Ok (Func func) where
-      func arg = transExp env' exp where
+      func arg = transExp env' expr where
         env' = insert ident arg env
   EApp func arg -> do
     funcVal <- transExp env func
@@ -60,7 +60,7 @@ transExp env x = case x of
         let argRes = transExp env arg
         f argRes
       _ -> Bad "cannot apply to a constant"
-  ECase exp caseParts ->
+  ECase expr caseParts ->
     let 
       matchSubpatterns :: Env -> [Result] -> [Pattern] -> Maybe (Err Env)
       matchSubpatterns env' results patterns =
@@ -79,10 +79,10 @@ transExp env x = case x of
       matchPattern env' _ PAny = Just (Ok env')
       matchPattern env' value (PValue (Ident str)) =
         Just $ Ok $ insert str (Ok value) env'
-      matchPattern env' value (PVariant (Ident expectedName) patterns) =
+      matchPattern env' value (PVariant (Ident exprectedName) patterns) =
         case value of
           Variant variantName variantData -> 
-            if variantName == expectedName
+            if variantName == exprectedName
               then matchSubpatterns env' variantData patterns
               else Nothing
           _ -> Just $ Bad $ 
@@ -95,7 +95,7 @@ transExp env x = case x of
           Just (Bad b) -> Just (Bad b)
           Nothing -> Nothing
     in do
-      val <- transExp env exp
+      val <- transExp env expr
       let matches = Data.Maybe.mapMaybe (matchCasePart val) caseParts
       case matches of 
         [] -> Bad "exhausted pattern matching"
@@ -152,7 +152,7 @@ interpretWithBuiltins :: Program -> Program -> Result
 interpretWithBuiltins (Program builtinsDecls) (Program programDecls) =
     do
       builtinEnv <- transDecls specialBuiltins builtinsDecls
-      transExp builtinEnv exp
+      transExp builtinEnv expr
   where
-    exp = ELet programDecls (EVar (Ident "main"))
+    expr = ELet programDecls (EVar (Ident "main"))
 

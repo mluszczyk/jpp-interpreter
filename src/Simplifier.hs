@@ -17,12 +17,12 @@ simplifyDeclBlock :: [AG.Decl] -> [SG.Decl]
 simplifyDeclBlock = map simplifyDecl
 
 simplifyDecl :: AG.Decl -> SG.Decl
-simplifyDecl (AG.DValue name args exp) =
-  SG.DValue (simplifyValueIdent name) (simplifyExp (desugarFunc args exp))
+simplifyDecl (AG.DValue name args expr) =
+  SG.DValue (simplifyValueIdent name) (simplifyExp (desugarFunc args expr))
   where
     desugarFunc :: [AG.ValueIdent] -> AG.Exp -> AG.Exp
-    desugarFunc argsIdents exp =
-      Prelude.foldr AG.ELambda exp argsIdents
+    desugarFunc argsIdents expr' =
+      Prelude.foldr AG.ELambda expr' argsIdents
 
 simplifyDecl (AG.DType name typeRef) =
   SG.DType (simplifyValueIdent name) (simplifyTypeRef typeRef)
@@ -61,33 +61,34 @@ ternaryOperation s e1 e2 e3 =
   SG.EApp (binaryOperation s e1 e2) (simplifyExp e3)
 
 simplifyExp :: AG.Exp -> SG.Exp
-simplifyExp exp = case exp of
-  AG.EAdd exp1 exp2 -> binaryOperation "+" exp1 exp2
-  AG.ESub exp1 exp2 -> binaryOperation "-" exp1 exp2
-  AG.EMul exp1 exp2 -> binaryOperation "*" exp1 exp2
-  AG.EDiv exp1 exp2 -> binaryOperation "`div`" exp1 exp2
-  AG.ELT exp1 exp2 -> binaryOperation "<" exp1 exp2
-  AG.ELTE exp1 exp2 -> binaryOperation "<=" exp1 exp2
-  AG.EGT exp1 exp2 -> binaryOperation ">" exp1 exp2
-  AG.EGTE exp1 exp2 -> binaryOperation ">=" exp1 exp2
-  AG.EEq exp1 exp2 -> binaryOperation "==" exp1 exp2
-  AG.ENEq exp1 exp2 -> binaryOperation "/=" exp1 exp2
-  AG.EAnd exp1 exp2 -> binaryOperation "and_" exp1 exp2
-  AG.EOr exp1 exp2 -> binaryOperation "or_" exp1 exp2
-  AG.EIf exp1 exp2 exp3 -> ternaryOperation "if_" exp1 exp2 exp3
+simplifyExp expr = case expr of
+  AG.EAdd expr1 expr2 -> binaryOperation "+" expr1 expr2
+  AG.ESub expr1 expr2 -> binaryOperation "-" expr1 expr2
+  AG.EMul expr1 expr2 -> binaryOperation "*" expr1 expr2
+  AG.EDiv expr1 expr2 -> binaryOperation "`div`" expr1 expr2
+  AG.ELT expr1 expr2 -> binaryOperation "<" expr1 expr2
+  AG.ELTE expr1 expr2 -> binaryOperation "<=" expr1 expr2
+  AG.EGT expr1 expr2 -> binaryOperation ">" expr1 expr2
+  AG.EGTE expr1 expr2 -> binaryOperation ">=" expr1 expr2
+  AG.EEq expr1 expr2 -> binaryOperation "==" expr1 expr2
+  AG.ENEq expr1 expr2 -> binaryOperation "/=" expr1 expr2
+  AG.EAnd expr1 expr2 -> binaryOperation "and_" expr1 expr2
+  AG.EOr expr1 expr2 -> binaryOperation "or_" expr1 expr2
+  AG.EIf expr1 expr2 expr3 -> ternaryOperation "if_" expr1 expr2 expr3
 
   AG.EInt integer -> SG.EInt integer
-  AG.ELet decls exp -> SG.ELet (simplifyDeclBlock decls) (simplifyExp exp)
+  AG.ELet decls expr' -> SG.ELet (simplifyDeclBlock decls) (simplifyExp expr')
   AG.EVarValue name -> SG.EVar (simplifyValueIdent name)
   AG.EVarType name -> SG.EVar (simplifyTypeIdent name)
-  AG.ELambda value exp -> SG.ELambda (simplifyValueIdent value) (simplifyExp exp)
-  AG.EApp exp1 exp2 -> SG.EApp (simplifyExp exp1) (simplifyExp exp2)
-  AG.ECase exp caseParts -> SG.ECase (simplifyExp exp) (
+  AG.ELambda value expr' ->
+    SG.ELambda (simplifyValueIdent value) (simplifyExp expr')
+  AG.EApp expr1 expr2 -> SG.EApp (simplifyExp expr1) (simplifyExp expr2)
+  AG.ECase expr' caseParts -> SG.ECase (simplifyExp expr') (
     map simplifyCasePart caseParts)
 
 simplifyCasePart :: AG.CasePart -> SG.CasePart
-simplifyCasePart (AG.CaseP pat exp) =
-  SG.CaseP (simplifyPattern pat) (simplifyExp exp)
+simplifyCasePart (AG.CaseP pat expr) =
+  SG.CaseP (simplifyPattern pat) (simplifyExp expr)
 
 simplifyPattern :: AG.Pattern -> SG.Pattern
 simplifyPattern (AG.PVariant typeIdent patterns) =

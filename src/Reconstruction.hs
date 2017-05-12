@@ -156,14 +156,14 @@ ti env (ELambda (Ident n) e) =
             env'' = TypeEnv (env' `Map.union` (Map.singleton n (Scheme [] tv)))
         (s1, t1) <- ti env'' e
         return (s1, TFun (apply s1 tv) t1)
-ti env exp@(EApp e1 e2) =
+ti env expr@(EApp e1 e2) =
     do  tv <- newTyVar "a"
         (s1, t1) <- ti env e1
         (s2, t2) <- ti (apply s1 env) e2
         s3 <- mgu (apply s2 t1) (TFun t2 tv)
         return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 tv)
     `catchError`
-    \e -> throwError $ e ++ "\n in " ++ show exp
+    \e -> throwError $ e ++ "\n in " ++ show expr
 
 ti env (ELet decls e) =
     do  (s1, env1) <- tiDecls env decls
