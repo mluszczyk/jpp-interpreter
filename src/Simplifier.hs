@@ -15,8 +15,12 @@ simplifyDeclBlock = map simplifyDecl
 
 simplifyDecl :: AG.Decl -> SG.Decl
 simplifyDecl (AG.DValue name args exp) =
-  SG.DValue (simplifyValueIdent name) 
-    (map simplifyValueIdent args) (simplifyExp exp)
+  SG.DValue (simplifyValueIdent name) (simplifyExp (desugarFunc args exp))
+  where
+    desugarFunc :: [AG.ValueIdent] -> AG.Exp -> AG.Exp
+    desugarFunc argsIdents exp =
+      Prelude.foldr AG.ELambda exp argsIdents
+
 simplifyDecl (AG.DType name typeRef) =
   SG.DType (simplifyValueIdent name) (simplifyTypeRef typeRef)
 simplifyDecl (AG.DData typeDecl variants) =

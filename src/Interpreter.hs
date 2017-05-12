@@ -33,9 +33,8 @@ transConstructor name (arg:rest) results =
   Func (\r -> Ok $ transConstructor name rest (results ++ [r]))
 
 transDecl :: Env -> Env -> Decl -> Err Env
-transDecl evalEnv envStub (DValue (Ident name) argsIdents exp) =
-  let func = Prelude.foldr ELambda exp argsIdents
-  in Ok $ insert name (transExp evalEnv func) envStub
+transDecl evalEnv envStub (DValue (Ident name) exp) =
+  Ok $ insert name (transExp evalEnv exp) envStub
 
 transDecl evalEnv envStub (DData declIgnored variants) =
   foldM go envStub variants where

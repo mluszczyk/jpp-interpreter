@@ -183,7 +183,7 @@ tiDecls env decls =
         return (s1 `composeSubst` s2, env')
 
 tiDecl :: TypeEnv -> Decl -> TI (Subst, TypeEnv)
-tiDecl env (DValue (Ident x) _ e1) =
+tiDecl env (DValue (Ident x) e1) =
     do  (s1, t1) <- ti env e1
         let TypeEnv env' = remove env x
             t' = generalize (apply s1 env) t1

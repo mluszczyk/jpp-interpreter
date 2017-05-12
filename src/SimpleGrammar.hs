@@ -14,7 +14,7 @@ data Exp
   deriving (Eq, Ord, Show, Read)
 
 data Decl
-    = DValue Ident [Ident] Exp
+    = DValue Ident Exp
     | DType Ident TypeRef
     | DData TypeDecl [Variant]
   deriving (Eq, Ord, Show, Read)
