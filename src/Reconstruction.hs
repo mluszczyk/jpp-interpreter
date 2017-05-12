@@ -228,6 +228,11 @@ transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs) =
     params <- mapM (transTypeRef freeVarsMap) typeRefs
     return $ TVariant ident params
 transTypeRef freeVarsMap (TRValue (Ident ident)) = return $ freeVarsMap Map.! ident
+transTypeRef freeVarsMap (TRFunc typeRef1 typeRef2) =
+  do
+    type1 <- transTypeRef freeVarsMap typeRef1
+    type2 <- transTypeRef freeVarsMap typeRef2
+    return $ TFun type1 type2
 
 -- running the inference algorithm
 typeInference :: TypeEnv -> Exp -> TI Type

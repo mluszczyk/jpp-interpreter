@@ -1,5 +1,7 @@
 data List a = Cons a (List a) | Nil ;
 
-data ListOfFunc a b = List (a -> b) ;
+data ListOfFunc a b = LOF (List (a -> b) ) ;
 
-main = 4
+id = \x -> x ;
+
+main = LOF (Cons id Nil)
