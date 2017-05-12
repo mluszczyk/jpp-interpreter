@@ -16,8 +16,6 @@ import qualified Text.PrettyPrint as PP
 
 import SimpleGrammar
 
-import Debug.Trace
-
 data Lit     =  LInt Integer
              deriving (Eq, Ord)
 
@@ -40,14 +38,13 @@ instance Types Type where
     ftv (TVar n)      =  Set.singleton n
     ftv TInt          =  Set.empty
     ftv (TFun t1 t2)  =  ftv t1 `Set.union` ftv t2
-    ftv (TVariant n params)  =  foldl Set.union Set.empty (map ftv params)
-
+    ftv (TVariant _ params)  =  foldl Set.union Set.empty (map ftv params)
 
     apply s (TVar n)      =  case Map.lookup n s of
                                Nothing  -> TVar n
                                Just t   -> t
     apply s (TFun t1 t2)  = TFun (apply s t1) (apply s t2)
-    apply s TInt             =  TInt
+    apply _ TInt             =  TInt
     apply s (TVariant name types) = (TVariant name (map (apply s) types))
 
 instance Types Scheme where
@@ -121,8 +118,8 @@ mgu TInt TInt                =  return nullSubst
 mgu (TVariant typeName1 params1) (TVariant typeName2 params2)
   | typeName1 == typeName2   =
       -- assert lenghts equal!
-      let go subst (params1, params2) =
-            do subst' <- mgu params1 params2
+      let go subst (param1, param2) =
+            do subst' <- mgu param1 param2
                return (subst `composeSubst` subst')
       in foldM go nullSubst (zip params1 params2)
         
@@ -178,9 +175,9 @@ tiDecls env decls =
   foldM go (nullSubst, env) decls
     where
       go :: (Subst, TypeEnv) -> Decl -> TI (Subst, TypeEnv)
-      go (s1, env) decl = do
-        (s2, env') <- tiDecl env decl
-        return (s1 `composeSubst` s2, env')
+      go (s1, env') decl = do
+        (s2, env'') <- tiDecl env' decl
+        return (s1 `composeSubst` s2, env'')
 
 tiDecl :: TypeEnv -> Decl -> TI (Subst, TypeEnv)
 tiDecl env (DValue (Ident x) e1) =
@@ -199,16 +196,16 @@ tiDecl env (DData (TDecl (Ident name) args) variants) =
   where
     go :: [Type] -> (Map.Map String Type) -> (Subst, TypeEnv) ->
           Variant -> TI (Subst, TypeEnv)
-    go freeVars freeVarsMap (s1, env) variant = do
-      (s2, env') <- declVariant freeVars freeVarsMap env name args variant
-      return (s1 `composeSubst` s2, env')
+    go freeVars freeVarsMap (s1, env') variant = do
+      (s2, env'') <- declVariant freeVars freeVarsMap env' name args variant
+      return (s1 `composeSubst` s2, env'')
 
-    unIdent (Ident name) = name
+    unIdent (Ident identName) = identName
 
 
 declVariant :: [Type] -> (Map.Map String Type) -> TypeEnv ->
                String -> a -> Variant -> TI (Subst, TypeEnv)
-declVariant freeVarsList freeVarsMap env typeName args 
+declVariant freeVarsList freeVarsMap env typeName _ 
             (Var (Ident varName) typeRefs) =
     do
         t <- mType
@@ -264,6 +261,7 @@ testProgram (Program declsList) =
     testExp (ELet declsList (EVar (Ident "main")))
 
 
+test :: Program -> IO ()
 test = testProgram
 
 -- printing the type

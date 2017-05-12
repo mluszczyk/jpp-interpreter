@@ -22,7 +22,6 @@ library
                        LexGrammar
                        ParGrammar
                        PrintGrammar
-                       SkelGrammar
                        ErrM
                        Interpreter
                        Reconstruction

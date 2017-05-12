@@ -6,6 +6,7 @@ module ErrM where
 
 -- the Error monad: like Maybe type with error msgs
 
+import Control.Monad.Fix
 import Control.Monad (MonadPlus(..), liftM)
 import Control.Applicative (Applicative(..), Alternative(..))
 
@@ -35,3 +36,9 @@ instance MonadPlus Err where
 instance Alternative Err where
   empty = mzero
   (<|>) = mplus
+
+instance MonadFix Err where
+    mfix f = let a = f (unRight a) in a
+             where unRight (Ok x) = x
+                   unRight (Bad _) = errorWithoutStackTrace "mfix Either: Left"
+

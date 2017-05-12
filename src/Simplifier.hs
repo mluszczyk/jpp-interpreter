@@ -7,7 +7,10 @@ simplify :: AG.Program -> SG.Program
 simplify (AG.Program decls) =
   SG.Program $ simplifyDeclBlock decls
 
+simplifyValueIdent :: AG.ValueIdent -> SG.Ident
 simplifyValueIdent (AG.ValueIdent name) = SG.Ident name
+
+simplifyTypeIdent :: AG.TypeIdent -> SG.Ident
 simplifyTypeIdent (AG.TypeIdent name) = SG.Ident name
 
 simplifyDeclBlock :: [AG.Decl] -> [SG.Decl]

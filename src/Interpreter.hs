@@ -2,14 +2,11 @@
 
 module Interpreter where
 
-import Debug.Trace
-
 import Control.Monad
-import Control.Monad.Fix
 import Data.Map as M
 import SimpleGrammar
 import ErrM
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 type Result = Err Value
 
 data Value = Const Integer | Func (Result -> Result) |
@@ -17,26 +14,21 @@ data Value = Const Integer | Func (Result -> Result) |
 
 instance Show Value where
   show (Const n) = "Const " ++ show n
-  show (Func f) = "Func"
+  show (Func _) = "Func"
   show (Variant s d) = "Variant " ++ s ++ show d
 
 type Env = M.Map String (Err Value)
 
-instance MonadFix Err where
-    mfix f = let a = f (unRight a) in a
-             where unRight (Ok x) = x
-                   unRight (Bad _) = errorWithoutStackTrace "mfix Either: Left"
-
 transConstructor :: String -> [a] -> [Result] -> Value
 transConstructor name [] results = Variant name results
-transConstructor name (arg:rest) results =
+transConstructor name (_:rest) results =
   Func (\r -> Ok $ transConstructor name rest (results ++ [r]))
 
 transDecl :: Env -> Env -> Decl -> Err Env
 transDecl evalEnv envStub (DValue (Ident name) exp) =
   Ok $ insert name (transExp evalEnv exp) envStub
 
-transDecl evalEnv envStub (DData declIgnored variants) =
+transDecl _ envStub (DData _ variants) =
   foldM go envStub variants where
     go :: Env -> Variant -> Err Env
     go env' (Var (Ident name) args) =
@@ -84,7 +76,7 @@ transExp env x = case x of
                 Bad s -> Just (Bad s)
 
       matchPattern :: Env -> Value -> Pattern -> Maybe (Err Env)
-      matchPattern env' value PAny = Just (Ok env')
+      matchPattern env' _ PAny = Just (Ok env')
       matchPattern env' value (PValue (Ident str)) =
         Just $ Ok $ insert str (Ok value) env'
       matchPattern env' value (PVariant (Ident expectedName) patterns) =
