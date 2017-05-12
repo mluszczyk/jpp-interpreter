@@ -33,7 +33,6 @@ data TypeRef
     = TRVariant Ident [TypeRef]
     | TRFunc TypeRef TypeRef
     | TRValue Ident
-    | TRSimpleVariant Ident
   deriving (Eq, Ord, Show, Read)
 
 data Variant = Var Ident [TypeRef]

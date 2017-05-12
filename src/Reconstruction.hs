@@ -16,13 +16,15 @@ import qualified Text.PrettyPrint as PP
 
 import SimpleGrammar
 
+import Debug.Trace
+
 data Lit     =  LInt Integer
              deriving (Eq, Ord)
 
 data Type    =  TVar String
              |  TInt
              |  TFun Type Type
-             |  TVariant String
+             |  TVariant String [Type]
              deriving (Eq, Ord)
 
 -- ?
@@ -38,14 +40,15 @@ instance Types Type where
     ftv (TVar n)      =  Set.singleton n
     ftv TInt          =  Set.empty
     ftv (TFun t1 t2)  =  ftv t1 `Set.union` ftv t2
-    ftv (TVariant n)  =  Set.empty
+    ftv (TVariant n params)  =  foldl Set.union Set.empty (map ftv params)
 
 
     apply s (TVar n)      =  case Map.lookup n s of
                                Nothing  -> TVar n
                                Just t   -> t
     apply s (TFun t1 t2)  = TFun (apply s t1) (apply s t2)
-    apply s t             =  t
+    apply s TInt             =  TInt
+    apply s (TVariant name types) = (TVariant name (map (apply s) types))
 
 instance Types Scheme where
     ftv (Scheme vars t)      =  (ftv t) `Set.difference` (Set.fromList vars)
@@ -74,7 +77,7 @@ instance Types TypeEnv where
     ftv (TypeEnv env)      =  ftv (Map.elems env)
     apply s (TypeEnv env)  =  TypeEnv (Map.map (apply s) env)
 
--- ?
+-- converts a type to a scheme by fetching all variables not bound by env
 generalize        ::  TypeEnv -> Type -> Scheme
 generalize env t  =   Scheme vars t
   where vars = Set.toList ((ftv t) `Set.difference` (ftv env))
@@ -115,8 +118,14 @@ mgu (TFun l r) (TFun l' r')  =  do  s1 <- mgu l l'
 mgu (TVar u) t               =  varBind u t
 mgu t (TVar u)               =  varBind u t
 mgu TInt TInt                =  return nullSubst
-mgu (TVariant typeName1) (TVariant typeName2)
-  | typeName1 == typeName2   =  return nullSubst
+mgu (TVariant typeName1 params1) (TVariant typeName2 params2)
+  | typeName1 == typeName2   =
+      -- assert lenghts equal!
+      let go subst (params1, params2) =
+            do subst' <- mgu params1 params2
+               return (subst `composeSubst` subst')
+      in foldM go nullSubst (zip params1 params2)
+        
   | otherwise = throwError $ "different variant types do not unfiy: " ++
                               typeName1 ++ " vs. " ++ show typeName2
 mgu t1 t2                    =  throwError $ "types do not unify: " ++ show t1 ++ 
@@ -181,24 +190,47 @@ tiDecl env (DValue (Ident x) e1) =
             env'' = TypeEnv (Map.insert x t' env')
         return (s1, env'')
 
+
 tiDecl env (DData (TDecl (Ident name) args) variants) =
-  foldM go (nullSubst, env) variants 
-    where
-      go :: (Subst, TypeEnv) -> Variant -> TI (Subst, TypeEnv)
-      go (s1, env) variant = do
-        (s2, env') <- declVariant env name args variant
-        return (s1 `composeSubst` s2, env')
+  do
+    freeVars <- mapM (newTyVar) (map (const "z") args)
+    let freeVarsMap = Map.fromList (zip (map unIdent args) freeVars)
+    foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
+  where
+    go :: [Type] -> (Map.Map String Type) -> (Subst, TypeEnv) ->
+          Variant -> TI (Subst, TypeEnv)
+    go freeVars freeVarsMap (s1, env) variant = do
+      (s2, env') <- declVariant freeVars freeVarsMap env name args variant
+      return (s1 `composeSubst` s2, env')
+
+    unIdent (Ident name) = name
 
 
-declVariant :: TypeEnv -> String -> a -> Variant -> TI (Subst, TypeEnv)
-declVariant env typeName args (Var (Ident varName) typeRefs) =
+declVariant :: [Type] -> (Map.Map String Type) -> TypeEnv ->
+               String -> a -> Variant -> TI (Subst, TypeEnv)
+declVariant freeVarsList freeVarsMap env typeName args 
+            (Var (Ident varName) typeRefs) =
     do
-        let TypeEnv env' = remove env varName
+        t <- mType
+        let
+            TypeEnv env' = remove env varName
             t' = generalize env t
             env'' = TypeEnv (Map.insert varName t' env')
         return (nullSubst, env'')
-    where t = TVariant typeName
-  
+    where base = TVariant typeName freeVarsList
+          mType = foldM go base (reverse typeRefs)
+          go :: Type -> TypeRef -> TI Type
+          go rest ref =
+            do
+              cType <- transTypeRef freeVarsMap ref
+              return $ TFun cType rest
+
+transTypeRef :: (Map.Map String Type) -> TypeRef -> TI Type
+transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs) =
+  do
+    params <- mapM (transTypeRef freeVarsMap) typeRefs
+    return $ TVariant ident params
+transTypeRef freeVarsMap (TRValue (Ident ident)) = return $ freeVarsMap Map.! ident
 
 -- running the inference algorithm
 typeInference :: TypeEnv -> Exp -> TI Type
@@ -228,7 +260,8 @@ prType             ::  Type -> PP.Doc
 prType (TVar n)    =   PP.text n
 prType TInt        =   PP.text "Int"
 prType (TFun t s)  =   prParenType t PP.<+> PP.text "->" PP.<+> prType s
-prType (TVariant n) =  PP.text n
+prType (TVariant n params) =  PP.text n PP.<+>
+                                PP.hsep (map prType params)
 
 prParenType     ::  Type -> PP.Doc
 prParenType  t  =   case t of

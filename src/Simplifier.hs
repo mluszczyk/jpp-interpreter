@@ -38,6 +38,12 @@ simplifyVariants (AG.SimpleVar typeIdent) =
 
 simplifyTypeRef :: AG.TypeRef -> SG.TypeRef
 simplifyTypeRef (AG.TRValue ident) = SG.TRValue (simplifyValueIdent ident)
+simplifyTypeRef (AG.TRFunc typeRef1 typeRef2) =
+  SG.TRFunc (simplifyTypeRef typeRef1) (simplifyTypeRef typeRef2)
+simplifyTypeRef (AG.TRVariant ident typeRefs) =
+  SG.TRVariant (simplifyTypeIdent ident) (map simplifyTypeRef typeRefs)
+simplifyTypeRef (AG.TRSimpleVariant ident) =
+  SG.TRVariant (simplifyTypeIdent ident) []
 
 unaryOperation :: String -> AG.Exp -> SG.Exp
 unaryOperation s e1 =

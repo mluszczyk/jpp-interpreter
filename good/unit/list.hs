@@ -1,3 +1,3 @@
-data List a = Cons a (List a) | Nil;
+data MyList a = MyCons a (MyList a) | MyNil;
 
-main = Cons 1 Nil
+main = MyCons 1 MyNil
