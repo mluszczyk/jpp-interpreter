@@ -240,10 +240,24 @@ typeInference env e =
 
 testExp :: Exp -> IO ()
 testExp e =
-    do  (res, _) <- runTI (typeInference (TypeEnv Map.empty) e)
+    do  (res, _) <- runTI (typeInference (TypeEnv builtins) e)
         case res of
           Left err  ->  putStrLn $ show e ++ "\n " ++ err ++ "\n"
           Right t   ->  putStrLn $ "Reconstruction: main :: " ++ show t ++ "\n"
+  where builtins = Map.fromList
+                    [ ("+", intIntInt)
+                    , ("-", intIntInt)
+                    , ("*", intIntInt)
+                    , ("`div`", intIntInt)
+                    , ("==", intIntBool)
+                    , ("/=", intIntBool)
+                    , ("<=", intIntBool)
+                    , ("<", intIntBool)
+                    , (">=", intIntBool)
+                    , (">", intIntBool)
+                    ]
+        intIntInt = Scheme [] $ TFun TInt (TFun TInt TInt)
+        intIntBool = Scheme [] $ TFun TInt (TFun TInt (TVariant "Bool" []))
 
 testProgram :: Program -> IO ()
 testProgram (Program declsList) =
