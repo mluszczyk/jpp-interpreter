@@ -32,12 +32,16 @@ data Type    =  TVar String
              |  TInt
              |  TBool
              |  TFun Type Type
+             |  TVariant String
              deriving (Eq, Ord)
 
+-- ?
 data Scheme  =  Scheme [String] Type
 
 class Types a where
+    -- free type variables
     ftv    ::  a -> Set.Set String
+    -- apply type substitution to the type
     apply  ::  Subst -> a -> a
 
 instance Types Type where
@@ -71,6 +75,7 @@ composeSubst s1 s2   = (Map.map (apply s1) s2) `Map.union` s1
 
 newtype TypeEnv = TypeEnv (Map.Map String Scheme)
 
+-- remove variable from type env
 remove                    ::  TypeEnv -> String -> TypeEnv
 remove (TypeEnv env) var  =  TypeEnv (Map.delete var env)
 
@@ -78,12 +83,15 @@ instance Types TypeEnv where
     ftv (TypeEnv env)      =  ftv (Map.elems env)
     apply s (TypeEnv env)  =  TypeEnv (Map.map (apply s) env)
 
+-- ?
 generalize        ::  TypeEnv -> Type -> Scheme
 generalize env t  =   Scheme vars t
   where vars = Set.toList ((ftv t) `Set.difference` (ftv env))
 
+-- um, is this unused?
 data TIEnv = TIEnv  {}
 
+-- tiSupply - variable counter used to create new varaibles
 data TIState = TIState { tiSupply :: Int }
 
 type TI a = ExceptT String (ReaderT TIEnv (StateT TIState IO)) a
@@ -95,17 +103,20 @@ runTI t =
   where initTIEnv = TIEnv
         initTIState = TIState{tiSupply = 0}
 
+-- create type variable
 newTyVar :: String -> TI Type
 newTyVar prefix =
     do  s <- get
         put s{tiSupply = tiSupply s + 1}
         return (TVar  (prefix ++ show (tiSupply s)))
 
+-- ?
 instantiate :: Scheme -> TI Type
 instantiate (Scheme vars t) = do  nvars <- mapM (\ _ -> newTyVar "a") vars
                                   let s = Map.fromList (zip vars nvars)
                                   return $ apply s t
 
+-- unification
 mgu :: Type -> Type -> TI Subst
 mgu (TFun l r) (TFun l' r')  =  do  s1 <- mgu l l'
                                     s2 <- mgu (apply s1 r) (apply s1 r')
@@ -113,19 +124,26 @@ mgu (TFun l r) (TFun l' r')  =  do  s1 <- mgu l l'
 mgu (TVar u) t               =  varBind u t
 mgu t (TVar u)               =  varBind u t
 mgu TInt TInt                =  return nullSubst
-mgu TBool TBool              =  return nullSubst
+mgu (TVariant typeName1) (TVariant typeName2)
+  | typeName1 == typeName2   =  return nullSubst
+  | otherwise = throwError $ "different variant types do not unfiy: " ++
+                              typeName1 ++ " vs. " ++ show typeName2
 mgu t1 t2                    =  throwError $ "types do not unify: " ++ show t1 ++ 
                                 " vs. " ++ show t2
 
+-- bind variable and return substitution, don't bind to self
+-- throw error if the variable is inside the other type
 varBind :: String -> Type -> TI Subst
 varBind u t  | t == TVar u           =  return nullSubst
              | u `Set.member` ftv t  =  throwError $ "occurs check fails: " ++ u ++
                                          " vs. " ++ show t
              | otherwise             =  return (Map.singleton u t)
 
+-- infer type of a literal
 tiLit :: Lit -> TI (Subst, Type)
 tiLit (LInt _)   =  return (nullSubst, TInt)
 
+-- infer type of exp
 ti        ::  TypeEnv -> Exp -> TI (Subst, Type)
 ti (TypeEnv env) (EVar (Ident ident)) = 
     case Map.lookup ident env of
@@ -151,67 +169,48 @@ ti env exp@(EApp e1 e2) =
     \e -> throwError $ e ++ "\n in " ++ show exp
 
 ti env (ELet decls e) =
-    case decls of
-    [] -> ti env e
-    [DValue (Ident x) _ e1] -> 
-        do  (s1, t1) <- ti env e1
-            let TypeEnv env' = remove env x
-                t' = generalize (apply s1 env) t1
-                env'' = TypeEnv (Map.insert x t' env')
-            (s2, t2) <- ti (apply s1 env'') e
-            return (s1 `composeSubst` s2, t2)
-    _ -> throwError "unsupported let"
+    do  (s1, env1) <- tiDecls env decls
+        (s2, t) <- ti (apply s1 env1) e
+        return (s1 `composeSubst` s2, t)
 
-typeInference :: Map.Map String Scheme -> Exp -> TI Type
+tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
+tiDecls env decls =
+  foldM go (nullSubst, env) decls
+    where
+      go :: (Subst, TypeEnv) -> Decl -> TI (Subst, TypeEnv)
+      go (s1, env) decl = do
+        (s2, env') <- tiDecl env decl
+        return (s1 `composeSubst` s2, env')
+
+tiDecl :: TypeEnv -> Decl -> TI (Subst, TypeEnv)
+tiDecl env (DValue (Ident x) _ e1) =
+    do  (s1, t1) <- ti env e1
+        let TypeEnv env' = remove env x
+            t' = generalize (apply s1 env) t1
+            env'' = TypeEnv (Map.insert x t' env')
+        return (s1, env'')
+
+-- running the inference algorithm
+typeInference :: TypeEnv -> Exp -> TI Type
 typeInference env e =
-    do  (s, t) <- ti (TypeEnv env) e
+    do  (s, t) <- ti env e
         return (apply s t)
-
-{-
-e0  =  ELet "id" (EAbs "x" (EVar "x"))
-        (EVar "id")
-
-e1  =  ELet "id" (EAbs "x" (EVar "x"))
-        (EApp (EVar "id") (EVar "id"))
-
-e2  =  ELet "id" (EAbs "x" (ELet "y" (EVar "x") (EVar "y")))
-        (EApp (EVar "id") (EVar "id"))
-
-e3  =  ELet "id" (EAbs "x" (ELet "y" (EVar "x") (EVar "y")))
-        (EApp (EApp (EVar "id") (EVar "id")) (ELit (LInt 2)))
-
-e4  =  ELet "id" (EAbs "x" (EApp (EVar "x") (EVar "x")))
-        (EVar "id")
-
-e5  =  EAbs "m" (ELet "y" (EVar "m")
-                 (ELet "x" (EApp (EVar "y") (ELit (LBool True)))
-                       (EVar "x")))
-       
-e6  =  EApp (ELit (LInt 2)) (ELit (LInt 2))
--}
 
 testExp :: Exp -> IO ()
 testExp e =
-    do  (res, _) <- runTI (typeInference Map.empty e)
+    do  (res, _) <- runTI (typeInference (TypeEnv Map.empty) e)
         case res of
           Left err  ->  putStrLn $ show e ++ "\n " ++ err ++ "\n"
           Right t   ->  putStrLn $ "Reconstruction: main :: " ++ show t ++ "\n"
 
-getMain :: Program -> Maybe Exp
-getMain (Program declsList) = msum (map go declsList)
-    where
-        go (DValue (Ident name) _ e) = 
-            if name == "main" then Just e else Nothing
-        go _ = Nothing
-
 testProgram :: Program -> IO ()
-testProgram program =
-    let maybeMainExp = getMain program in
-    maybe (putStrLn "main is missing") testExp maybeMainExp
+testProgram (Program declsList) =
+    testExp (ELet declsList (EVar (Ident "main")))
 
 
 test = testProgram
 
+-- printing the type
 instance Show Type where
     showsPrec _ x = shows (prType x)
 

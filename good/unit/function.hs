@@ -1,2 +1,2 @@
-f x = x + 5;
+f x = x ;
 main = f 5
