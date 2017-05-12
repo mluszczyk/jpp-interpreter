@@ -16,21 +16,11 @@ import qualified Text.PrettyPrint as PP
 
 import SimpleGrammar
 
-{-data Exp     =  EVar String
-             |  ELit Lit
-             |  EApp Exp Exp
-             |  EAbs String Exp
-             |  ELet String Exp Exp
-             deriving (Eq, Ord)
--}
-
 data Lit     =  LInt Integer
-             |  LBool Bool
              deriving (Eq, Ord)
 
 data Type    =  TVar String
              |  TInt
-             |  TBool
              |  TFun Type Type
              |  TVariant String
              deriving (Eq, Ord)
@@ -47,8 +37,9 @@ class Types a where
 instance Types Type where
     ftv (TVar n)      =  Set.singleton n
     ftv TInt          =  Set.empty
-    ftv TBool         =  Set.empty
     ftv (TFun t1 t2)  =  ftv t1 `Set.union` ftv t2
+    ftv (TVariant n)  =  Set.empty
+
 
     apply s (TVar n)      =  case Map.lookup n s of
                                Nothing  -> TVar n
@@ -190,6 +181,25 @@ tiDecl env (DValue (Ident x) e1) =
             env'' = TypeEnv (Map.insert x t' env')
         return (s1, env'')
 
+tiDecl env (DData (TDecl (Ident name) args) variants) =
+  foldM go (nullSubst, env) variants 
+    where
+      go :: (Subst, TypeEnv) -> Variant -> TI (Subst, TypeEnv)
+      go (s1, env) variant = do
+        (s2, env') <- declVariant env name args variant
+        return (s1 `composeSubst` s2, env')
+
+
+declVariant :: TypeEnv -> String -> a -> Variant -> TI (Subst, TypeEnv)
+declVariant env typeName args (Var (Ident varName) typeRefs) =
+    do
+        let TypeEnv env' = remove env varName
+            t' = generalize env t
+            env'' = TypeEnv (Map.insert varName t' env')
+        return (nullSubst, env'')
+    where t = TVariant typeName
+  
+
 -- running the inference algorithm
 typeInference :: TypeEnv -> Exp -> TI Type
 typeInference env e =
@@ -217,8 +227,8 @@ instance Show Type where
 prType             ::  Type -> PP.Doc
 prType (TVar n)    =   PP.text n
 prType TInt        =   PP.text "Int"
-prType TBool       =   PP.text "Bool"
 prType (TFun t s)  =   prParenType t PP.<+> PP.text "->" PP.<+> prType s
+prType (TVariant n) =  PP.text n
 
 prParenType     ::  Type -> PP.Doc
 prParenType  t  =   case t of
@@ -230,7 +240,6 @@ instance Show Lit where
 
 prLit            ::  Lit -> PP.Doc
 prLit (LInt i)   =   PP.integer i
-prLit (LBool b)  =   if b then PP.text "True" else PP.text "False"
 
 instance Show Scheme where
     showsPrec _ x = shows (prScheme x)
