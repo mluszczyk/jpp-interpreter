@@ -25,7 +25,9 @@ data Type    =  TVar String
              |  TVariant String [Type]
              deriving (Eq, Ord)
 
--- ?
+-- type with "forall" variables
+-- note, that there may be some other free type variables, that should bind
+-- to the env (see function generalize)
 data Scheme  =  Scheme [String] Type
 
 class Types a where
@@ -64,6 +66,8 @@ nullSubst  =   Map.empty
 composeSubst         :: Subst -> Subst -> Subst
 composeSubst s1 s2   = (Map.map (apply s1) s2) `Map.union` s1
 
+-- like env in the interpreter, but stores types (schemes to be precise)
+-- rather than values
 newtype TypeEnv = TypeEnv (Map.Map String Scheme)
 
 -- remove variable from type env
@@ -85,6 +89,10 @@ data TIEnv = TIEnv  {}
 -- tiSupply - variable counter used to create new varaibles
 data TIState = TIState { tiSupply :: Int }
 
+-- IO is for putStrLn
+-- reader is unused
+-- state is for the variable counter
+-- except is for unification errors
 type TI a = ExceptT String (ReaderT TIEnv (StateT TIState IO)) a
 
 runTI :: TI a -> IO (Either String a, TIState)
@@ -170,6 +178,14 @@ ti env (ELet decls e) =
         (s2, t) <- ti (apply s1 env1) e
         return (s1 `composeSubst` s2, t)
 
+ti env (ECase expr caseParts) =
+    case caseParts of
+      [CaseP PAny expr'] -> ti env expr'
+      [CaseP (PValue (Ident n)) expr'] ->
+          ti env (EApp (ELambda (Ident n) expr') expr)
+            
+           
+
 tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
 tiDecls env decls =
   foldM go (nullSubst, env) decls
@@ -190,7 +206,7 @@ tiDecl env (DValue (Ident x) e1) =
 
 tiDecl env (DData (TDecl (Ident name) args) variants) =
   do
-    freeVars <- mapM (newTyVar) (map (const "z") args)
+    freeVars <- mapM (newTyVar) (map (const "a") args)
     let freeVarsMap = Map.fromList (zip (map unIdent args) freeVars)
     foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
   where
