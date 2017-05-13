@@ -68,39 +68,37 @@ composeSubst s1 s2   = (Map.map (apply s1) s2) `Map.union` s1
 
 -- like env in the interpreter, but stores types (schemes to be precise)
 -- rather than values
-newtype TypeEnv = TypeEnv (Map.Map String Scheme)
+data TypeEnv = TypeEnv { varsMap :: Map.Map String Scheme
+                       , variantsMap :: Map.Map String String
+                       }
 
 -- remove variable from type env
 remove                    ::  TypeEnv -> String -> TypeEnv
-remove (TypeEnv env) var  =  TypeEnv (Map.delete var env)
+remove envStruct var  =
+      TypeEnv {varsMap = Map.delete var (varsMap envStruct)
+              , variantsMap = variantsMap envStruct}
 
 instance Types TypeEnv where
-    ftv (TypeEnv env)      =  ftv (Map.elems env)
-    apply s (TypeEnv env)  =  TypeEnv (Map.map (apply s) env)
+    ftv env      =  ftv (Map.elems (varsMap env))
+    apply s env  =  TypeEnv { varsMap = (Map.map (apply s) (varsMap env))
+                            , variantsMap = variantsMap env }
 
 -- converts a type to a scheme by fetching all variables not bound by env
 generalize        ::  TypeEnv -> Type -> Scheme
 generalize env t  =   Scheme vars t
   where vars = Set.toList ((ftv t) `Set.difference` (ftv env))
 
--- um, is this unused?
-data TIEnv = TIEnv  {}
-
 -- tiSupply - variable counter used to create new varaibles
 data TIState = TIState { tiSupply :: Int }
 
--- IO is for putStrLn
--- reader is unused
 -- state is for the variable counter
 -- except is for unification errors
-type TI a = ExceptT String (ReaderT TIEnv (StateT TIState IO)) a
+type TI a = ExceptT String (State TIState) a
 
-runTI :: TI a -> IO (Either String a, TIState)
+runTI :: TI a -> (Either String a, TIState)
 runTI t = 
-    do (res, st) <- runStateT (runReaderT (runExceptT t) initTIEnv) initTIState
-       return (res, st)
-  where initTIEnv = TIEnv
-        initTIState = TIState{tiSupply = 0}
+    runState (runExceptT t) initTIState
+  where initTIState = TIState{tiSupply = 0}
 
 -- create type variable
 newTyVar :: String -> TI Type
@@ -150,8 +148,8 @@ tiLit (LInt _)   =  return (nullSubst, TInt)
 
 -- infer type of exp
 ti        ::  TypeEnv -> Exp -> TI (Subst, Type)
-ti (TypeEnv env) (EVar (Ident ident)) = 
-    case Map.lookup ident env of
+ti env (EVar (Ident ident)) = 
+    case Map.lookup ident (varsMap env) of
        Nothing     ->  throwError $ "unbound variable: " ++ ident
        Just sigma  ->  do  t <- instantiate sigma
                            return (nullSubst, t)
@@ -160,8 +158,12 @@ ti _ (EInt integer) = tiLit (LInt integer)
 
 ti env (ELambda (Ident n) e) =
     do  tv <- newTyVar "a"
-        let TypeEnv env' = remove env n
-            env'' = TypeEnv (env' `Map.union` (Map.singleton n (Scheme [] tv)))
+        let env' = remove env n
+            env'' = TypeEnv
+              { varsMap = (varsMap env') 
+                    `Map.union` (Map.singleton n (Scheme [] tv))
+              , variantsMap = variantsMap env'
+              }
         (s1, t1) <- ti env'' e
         return (s1, TFun (apply s1 tv) t1)
 ti env expr@(EApp e1 e2) =
@@ -178,13 +180,46 @@ ti env (ELet decls e) =
         (s2, t) <- ti (apply s1 env1) e
         return (s1 `composeSubst` s2, t)
 
-ti env (ECase expr caseParts) =
+ti env (ECase expr caseParts) = do
     case caseParts of
-      [CaseP PAny expr'] -> ti env expr'
-      [CaseP (PValue (Ident n)) expr'] ->
-          ti env (EApp (ELambda (Ident n) expr') expr)
-            
-           
+      [CaseP pattern thenExpr] -> do
+          (s1, exprType) <- ti env expr
+          (patternType, varMap) <- casePartToType env pattern
+          s2 <- mgu patternType exprType
+          let envMapUpdate = Map.map (Scheme []) varMap
+          (s3, thenExprType) <- ti (apply (s2 `composeSubst` s1)
+              (TypeEnv { varsMap = envMapUpdate `Map.union` (varsMap env)
+                       , variantsMap = variantsMap env
+                       })) thenExpr
+          return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 thenExprType)
+
+casePartToType :: TypeEnv -> Pattern -> TI (Type, Map.Map String Type)
+casePartToType _ (PAny) = do
+  var <- newTyVar "a"
+  return (var, Map.empty)
+
+casePartToType _ (PValue (Ident n)) = do
+  var <- newTyVar "a"
+  return (var, Map.singleton n var)
+
+casePartToType env (PVariant (Ident ident) paramPatterns) = do
+  -- take the correct type
+  -- check the number of parameters and thier types probably
+  typeName <- variantNameToType (variantsMap env) ident
+  (paramTypes, vars) <- foldM goParam ([], Map.empty) paramPatterns
+  return (TVariant typeName paramTypes, vars)
+  where goParam (prevTypes, prevVars) pattern = do
+            (patternType, patternVars) <- casePartToType env pattern
+            return (prevTypes ++ [patternType], prevVars `Map.union` patternVars)
+            -- todo: errors on conflicts in union
+
+variantNameToType :: Map.Map String String -> String -> TI String
+variantNameToType consMap consName =
+  (maybe 
+    (throwError $ "constructor " ++ consName ++ " undefined")
+    (return . id)
+    (Map.lookup consName consMap) )
+
 
 tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
 tiDecls env decls =
@@ -198,9 +233,11 @@ tiDecls env decls =
 tiDecl :: TypeEnv -> Decl -> TI (Subst, TypeEnv)
 tiDecl env (DValue (Ident x) e1) =
     do  (s1, t1) <- ti env e1
-        let TypeEnv env' = remove env x
+        let env' = remove env x
             t' = generalize (apply s1 env) t1
-            env'' = TypeEnv (Map.insert x t' env')
+            env'' = TypeEnv { varsMap = Map.insert x t' (varsMap env')
+                            , variantsMap = variantsMap env'
+                            }
         return (s1, env'')
 
 
@@ -226,9 +263,12 @@ declVariant freeVarsList freeVarsMap env typeName _
     do
         t <- mType
         let
-            TypeEnv env' = remove env varName
+            env' = remove env varName
             t' = generalize env t
-            env'' = TypeEnv (Map.insert varName t' env')
+            env'' = TypeEnv { varsMap = Map.insert varName t' (varsMap env')
+                            , variantsMap = 
+                                Map.insert varName typeName (variantsMap env')
+                            }
         return (nullSubst, env'')
     where base = TVariant typeName freeVarsList
           mType = foldM go base (reverse typeRefs)
@@ -258,11 +298,12 @@ typeInference env e =
 
 testExp :: Exp -> IO ()
 testExp e =
-    do  (res, _) <- runTI (typeInference (TypeEnv builtins) e)
-        case res of
-          Left err  ->  putStrLn $ show e ++ "\n " ++ err ++ "\n"
-          Right t   ->  putStrLn $ "Reconstruction: main :: " ++ show t ++ "\n"
-  where builtins = Map.fromList
+    case fst (runTI (typeInference builtinEnv e)) of
+        Left err  ->  putStrLn $ show e ++ "\n " ++ err ++ "\n"
+        Right t   ->  putStrLn $ "Reconstruction: main :: " ++ show t ++ "\n"
+  where 
+        builtinEnv = TypeEnv {varsMap = builtins, variantsMap = Map.empty}
+        builtins = Map.fromList
                     [ ("+", intIntInt)
                     , ("-", intIntInt)
                     , ("*", intIntInt)
