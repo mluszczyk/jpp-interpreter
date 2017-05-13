@@ -69,7 +69,8 @@ composeSubst s1 s2   = (Map.map (apply s1) s2) `Map.union` s1
 -- like env in the interpreter, but stores types (schemes to be precise)
 -- rather than values
 data TypeEnv = TypeEnv { varsMap :: Map.Map String Scheme
-                       , variantsMap :: Map.Map String String
+                       , variantsMap :: 
+                          Map.Map String (() -> TI (Type, [Type]))
                        }
 
 -- remove variable from type env
@@ -181,44 +182,67 @@ ti env (ELet decls e) =
         return (s1 `composeSubst` s2, t)
 
 ti env (ECase expr caseParts) = do
-    case caseParts of
-      [CaseP pattern thenExpr] -> do
-          (s1, exprType) <- ti env expr
-          (patternType, varMap) <- casePartToType env pattern
-          s2 <- mgu patternType exprType
+    (subst, exprType) <- ti env expr
+    resultType <- newTyVar "a"
+    (s, _, t) <- foldM go (subst, exprType, resultType) caseParts
+    return (s, t)
+
+  where 
+    go (s1, exprType, resultType) (CaseP pattern result) = do
+          (patternType, varMap, s2) <- casePartToType env pattern s1
+          s3 <- mgu patternType (apply s2 exprType)
           let envMapUpdate = Map.map (Scheme []) varMap
-          (s3, thenExprType) <- ti (apply (s2 `composeSubst` s1)
+          (s4, resultType') <- ti (apply (s3 `composeSubst` s2)
               (TypeEnv { varsMap = envMapUpdate `Map.union` (varsMap env)
                        , variantsMap = variantsMap env
-                       })) thenExpr
-          return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 thenExprType)
+                       })) result
+          s5 <- mgu (apply (
+            s4 `composeSubst` s3 `composeSubst` s2
+            ) resultType) resultType'
+          return (s5 `composeSubst` s4 `composeSubst` s3 `composeSubst` s2 `composeSubst` s1
+                 , apply (s5 `composeSubst` s4 `composeSubst` s3 `composeSubst` s2) exprType
+                 , apply (s5 `composeSubst` s4 `composeSubst` s3 `composeSubst` s2) resultType')
 
-casePartToType :: TypeEnv -> Pattern -> TI (Type, Map.Map String Type)
-casePartToType _ (PAny) = do
+casePartToType :: TypeEnv -> Pattern -> Subst -> 
+                  TI (Type, Map.Map String Type, Subst)
+casePartToType _ (PAny) _ = do
   var <- newTyVar "a"
-  return (var, Map.empty)
+  return (var, Map.empty, nullSubst)
 
-casePartToType _ (PValue (Ident n)) = do
+casePartToType _ (PValue (Ident n)) _ = do
   var <- newTyVar "a"
-  return (var, Map.singleton n var)
+  return (var, Map.singleton n var, nullSubst)
 
-casePartToType env (PVariant (Ident ident) paramPatterns) = do
-  -- take the correct type
-  -- check the number of parameters and thier types probably
-  typeName <- variantNameToType (variantsMap env) ident
-  (paramTypes, vars) <- foldM goParam ([], Map.empty) paramPatterns
-  return (TVariant typeName paramTypes, vars)
-  where goParam (prevTypes, prevVars) pattern = do
-            (patternType, patternVars) <- casePartToType env pattern
-            return (prevTypes ++ [patternType], prevVars `Map.union` patternVars)
-            -- todo: errors on conflicts in union
+casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
+  (cType, cParamTypes) <- getConstType env ident
+  when (length cParamTypes /= length paramPatterns)
+      (throwError $ "parameter number mismatch in case expression " ++
+                   "for constructor " ++ ident)
+  (paramTypes, vars, subst3) <- 
+    foldM goParam ([], Map.empty, subst1) paramPatterns
+  
+  subst4 <- foldM uniParam subst3 (zip cParamTypes paramTypes)
 
-variantNameToType :: Map.Map String String -> String -> TI String
-variantNameToType consMap consName =
-  (maybe 
+  return (apply (subst4 `composeSubst` subst3) cType, vars
+         , subst4 `composeSubst` subst3 `composeSubst` 
+           subst1)
+  where
+    goParam (prevTypes, prevVars, subst2) pattern = do
+            (patternType, patternVars, subst3) <- casePartToType env pattern subst2
+            return ( prevTypes ++ [patternType]
+                   , prevVars `Map.union` patternVars 
+                      -- todo: errors on conflicts in union
+                   , subst3)
+    uniParam :: Subst -> (Type, Type) -> TI Subst
+    uniParam subst2 (type1, type2) =
+      mgu (apply subst2 type1) (apply subst2 type2)
+
+getConstType :: TypeEnv -> String -> TI (Type, [Type])
+getConstType env consName =
+  maybe 
     (throwError $ "constructor " ++ consName ++ " undefined")
-    (return . id)
-    (Map.lookup consName consMap) )
+    (\x -> do x ())
+    (Map.lookup consName (variantsMap env))
 
 
 tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
@@ -244,45 +268,52 @@ tiDecl env (DValue (Ident x) e1) =
 tiDecl env (DData (TDecl (Ident name) args) variants) =
   do
     freeVars <- mapM (newTyVar) (map (const "a") args)
-    let freeVarsMap = Map.fromList (zip (map unIdent args) freeVars)
+    let freeVarsMap = Map.fromList (zip argNames freeVars)
     foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
   where
+    argNames = map unIdent args
     go :: [Type] -> (Map.Map String Type) -> (Subst, TypeEnv) ->
           Variant -> TI (Subst, TypeEnv)
     go freeVars freeVarsMap (s1, env') variant = do
-      (s2, env'') <- declVariant freeVars freeVarsMap env' name args variant
+      (s2, env'') <- declVariant freeVars freeVarsMap env' name argNames variant
       return (s1 `composeSubst` s2, env'')
 
     unIdent (Ident identName) = identName
 
 
 declVariant :: [Type] -> (Map.Map String Type) -> TypeEnv ->
-               String -> a -> Variant -> TI (Subst, TypeEnv)
-declVariant freeVarsList freeVarsMap env typeName _ 
-            (Var (Ident varName) typeRefs) =
+               String -> [String] -> Variant -> TI (Subst, TypeEnv)
+declVariant freeVars _ env typeName paramNames 
+            variant@(Var (Ident varName) typeRefs) =
     do
-        t <- mType
+        (baseType, paramTypes) <- buildConstType typeName paramNames variant freeVars
+        let t = foldl (flip TFun) baseType (reverse paramTypes)
         let
             env' = remove env varName
             t' = generalize env t
             env'' = TypeEnv { varsMap = Map.insert varName t' (varsMap env')
-                            , variantsMap = 
-                                Map.insert varName typeName (variantsMap env')
+                            , variantsMap =
+                              Map.insert varName typeFunc (variantsMap env')
                             }
         return (nullSubst, env'')
-    where base = TVariant typeName freeVarsList
-          mType = foldM go base (reverse typeRefs)
-          go :: Type -> TypeRef -> TI Type
-          go rest ref =
-            do
-              cType <- transTypeRef freeVarsMap ref
-              return $ TFun cType rest
+  where
+    typeFunc :: () -> TI (Type, [Type])
+    typeFunc _ = do
+      newFreeVars <- mapM (const (newTyVar "a")) freeVars
+      buildConstType typeName paramNames variant newFreeVars
+
+buildConstType :: String -> [String] -> Variant -> [Type] -> TI (Type, [Type])
+buildConstType typeName typeParams (Var (Ident varName) typeRefs) freeVars =
+  let freeVarsMap = Map.fromList (zip typeParams freeVars) in do
+    paramTypes <- mapM (transTypeRef freeVarsMap) typeRefs
+    return (TVariant typeName freeVars, paramTypes)
+  
 
 transTypeRef :: (Map.Map String Type) -> TypeRef -> TI Type
 transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs) =
   do
     params <- mapM (transTypeRef freeVarsMap) typeRefs
-    return $ TVariant ident params
+    return $ TVariant ident params -- todo: check existance and num of parameters
 transTypeRef freeVarsMap (TRValue (Ident ident)) = return $ freeVarsMap Map.! ident
 transTypeRef freeVarsMap (TRFunc typeRef1 typeRef2) =
   do
