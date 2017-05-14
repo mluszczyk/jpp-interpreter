@@ -1,7 +1,7 @@
 module Main where
 
 
-import System.IO ( stdin, hGetContents )
+import System.IO ( stdin, hGetContents, hPutStrLn, stderr )
 import System.Exit ( exitFailure, exitSuccess )
 import System.Environment ( getArgs )
 
@@ -14,7 +14,8 @@ import Reconstruction ( testWithBuiltins )
 import Simplifier ( simplify )
 
 import ErrM
-import AbsGrammar ( Program )
+import qualified AbsGrammar as AG
+import qualified SimpleGrammar as SG
 
 import Paths_interpreteur
 
@@ -25,28 +26,35 @@ myLLexer = myLexer
 
 type Verbosity = Int
 
-runFile :: ([Token] -> Err Program) -> String -> IO b
-runFile p f = readFile f >>= run p
+printError :: String -> IO ()
+printError = hPutStrLn stderr
+
+runFile :: ([Token] -> Err AG.Program) -> String ->
+           (SG.Program -> SG.Program -> Either String String) -> IO b
+runFile p f r = readFile f >>= run p r
 
 parse :: (Show b, Print b) => ([Token] -> Err b) -> String -> IO b
 parse p s = let ts = myLLexer s in case p ts of
-           Bad message  -> do putStrLn "\nParse              Failed...\n"
-                              putStrLn "Tokens:"
-                              putStrLn $ show ts
-                              putStrLn message
+           Bad message  -> do printError "Parsing failed"
+                              printError "Tokens"
+                              printError $ show ts
+                              printError message
                               exitFailure
            Ok  tree -> return tree
 
-run :: ([Token] -> Err Program) -> String -> IO b
-run p s = do
+run :: ([Token] -> Err AG.Program) -> (SG.Program -> SG.Program -> Either String String) ->
+       String -> IO b
+run p interpreterFunc s = do
   builtinsPath <- getDataFileName "data/builtins.hs"
   builtinsFile <- readFile builtinsPath
   builtinsTree <- parse p builtinsFile
   let sBuiltinsTree = simplify builtinsTree
   tree <- parse p s
   let sTree = simplify tree
-  putStrLn $ show $ testWithBuiltins sBuiltinsTree sTree
-  putStrLn $ show (interpretWithBuiltins sBuiltinsTree sTree)
+  either 
+    (\x -> do printError x; exitFailure)
+    (\x -> putStrLn x)
+    (interpreterFunc sBuiltinsTree sTree)
   exitSuccess
 
 usage :: IO ()
@@ -54,8 +62,9 @@ usage = do
   putStrLn $ unlines
     [ "usage: Call with one of the following argument combinations:"
     , "  --help          Display this help message."
-    , "  (no arguments)  Parse stdin verbosely."
-    , "  (file)          Parse content of files verbosely."
+    , "  (file)          Type check and interpret the file."
+    , "  -t (file)       Only type check the file and print the type of main function."
+    , "  -d (file)       (Dynamic typing) only interpret the file without type checking."
     ]
   exitFailure
 
@@ -64,13 +73,27 @@ main = do
   args <- getArgs
   case args of
     ["--help"] -> usage
-    [] -> hGetContents stdin >>= run pProgram
-    [path] -> runFile pProgram path
+    [path] -> runFile pProgram path checkInterpret
+    ["-t", path] -> runFile pProgram path typeCheck
+    ["-d", path] -> runFile pProgram path dynInterpret
     _ -> do
-            putStrLn "\nIncorrect arguments"
+            printError "Incorrect arguments"
             exitFailure
 
+  where 
+    checkInterpret :: SG.Program -> SG.Program -> Either String String
+    checkInterpret sBuiltinsTree sTree = do
+      typeCheck sBuiltinsTree sTree
+      dynInterpret sBuiltinsTree sTree
+   
+    typeCheck :: SG.Program -> SG.Program -> Either String String
+    typeCheck builtinsTree tree = do
+      res <- testWithBuiltins builtinsTree tree
+      return $ show res
 
-
-
+    dynInterpret :: SG.Program -> SG.Program -> Either String String
+    dynInterpret builtinsTree tree =
+      case interpretWithBuiltins builtinsTree tree of
+        Bad s -> Left s
+        Ok s -> Right $ show s
 

@@ -42,3 +42,6 @@ instance MonadFix Err where
              where unRight (Ok x) = x
                    unRight (Bad _) = errorWithoutStackTrace "mfix Either: Left"
 
+toEither :: Err a -> Either String a
+toEither (Bad a) = Left a
+toEither (Ok a) = Right a
