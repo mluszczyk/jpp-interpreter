@@ -276,6 +276,16 @@ tiDecl env (DValue (Ident x) e1) =
         return (s1, apply s1 env'')
 
 
+tiDecl env (DType (Ident name) typeRef) = do
+  t <- transTypeRef (Map.empty) typeRef
+  let env' = remove env name
+      s = generalize env t
+      env'' = TypeEnv { varsMap = Map.insert name s (varsMap env')
+                      , variantsMap = variantsMap env'
+                      }
+  return (nullSubst, env'')
+
+
 tiDecl env (DData (TDecl (Ident name) args) variants) =
   do
     freeVars <- mapM (newTyVar . const ()) args
