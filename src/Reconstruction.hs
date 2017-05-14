@@ -17,6 +17,7 @@ import qualified Text.PrettyPrint as PP
 import SimpleGrammar
 
 
+intVerboseName :: String
 intVerboseName = "Integer"
 
 newtype Lit     =  LInt Integer
