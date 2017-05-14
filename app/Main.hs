@@ -1,7 +1,7 @@
 module Main where
 
 
-import System.IO ( stdin, hGetContents, hPutStrLn, stderr )
+import System.IO ( hPutStrLn, stderr )
 import System.Exit ( exitFailure, exitSuccess )
 import System.Environment ( getArgs )
 
@@ -83,7 +83,7 @@ main = do
   where 
     checkInterpret :: SG.Program -> SG.Program -> Either String String
     checkInterpret sBuiltinsTree sTree = do
-      typeCheck sBuiltinsTree sTree
+      _ <- typeCheck sBuiltinsTree sTree
       dynInterpret sBuiltinsTree sTree
    
     typeCheck :: SG.Program -> SG.Program -> Either String String

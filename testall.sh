@@ -1,2 +1,8 @@
-for x in good/unit/*; do echo $x ; ./run $x; echo; done;
+for x in good/unit/*;
+do
+  echo $x ;
+  ./interpreter -t $x;
+  ./interpreter -d $x;
+  echo;
+done;
 
