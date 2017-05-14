@@ -322,15 +322,22 @@ transTypeRef freeVarsMap (TRFunc typeRef1 typeRef2) =
     return $ TFun type1 type2
 
 -- running the inference algorithm
-typeInference :: TypeEnv -> Exp -> TI Type
-typeInference env e =
-    do  (s, t) <- ti env e
-        return (apply s t)
+typeInference :: TypeEnv -> Program -> Program -> TI Type
+typeInference env1 (Program builtinDecls) (Program decls) =
+  do 
+    (s1, env2) <- tiDecls env1 builtinDecls
+    let env3 = apply s1 env2
+    (s2, t) <- ti env3 e
+    return (apply (s2 `composeSubst` s1) t)
 
-testExp :: Exp -> IO ()
-testExp e =
-    case fst (runTI (typeInference builtinEnv e)) of
-        Left err  ->  putStrLn $ show e ++ "\n " ++ err ++ "\n"
+  where
+    e = ELet decls (EVar (Ident "main"))
+
+
+testWithBuiltins :: Program -> Program -> IO ()
+testWithBuiltins builtinProgram program = 
+    case fst (runTI (typeInference builtinEnv builtinProgram program)) of
+        Left err  ->  putStrLn $ err ++ "\n"
         Right t   ->  putStrLn $ "Reconstruction: main :: " ++ show t ++ "\n"
   where 
         builtinEnv = TypeEnv {varsMap = builtins, variantsMap = Map.empty}
@@ -348,14 +355,6 @@ testExp e =
                     ]
         intIntInt = Scheme [] $ TFun TInt (TFun TInt TInt)
         intIntBool = Scheme [] $ TFun TInt (TFun TInt (TVariant "Bool" []))
-
-testProgram :: Program -> IO ()
-testProgram (Program declsList) =
-    testExp (ELet declsList (EVar (Ident "main")))
-
-
-test :: Program -> IO ()
-test = testProgram
 
 -- printing the type
 instance Show Type where

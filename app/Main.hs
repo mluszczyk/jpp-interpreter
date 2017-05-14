@@ -10,7 +10,7 @@ import LexGrammar
 import ParGrammar
 import PrintGrammar
 
-import Reconstruction ( test )
+import Reconstruction ( testWithBuiltins )
 import Simplifier ( simplify )
 
 import ErrM
@@ -52,7 +52,7 @@ run v p s = do
   putStrLn "parsing file"
   tree <- parse v p s
   let sTree = simplify tree
-  test sTree
+  testWithBuiltins sBuiltinsTree sTree
   putStrLn $ show (interpretWithBuiltins sBuiltinsTree sTree)
   exitSuccess
 
