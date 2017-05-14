@@ -16,10 +16,10 @@ Similarities to Haskell:
 - laziness,
 - static binding,
 - polymorphic variant types (including boolean), integers, functions,
-- pattern matching on variatn types (only in the `case` statement, 
+- pattern matching on variant types (only in the `case` statement, 
   but not in function declarations),
 - recursive inc. mutually recursive functions, data types and values 
-  (infinite lists as in Haskell),
+  (infinite lists as in Haskell), this only works in the `-d` mode currently,
 - language constructs like `let`, `where`, anonymous functions (one parameter only),
   named functions (support multiple parameters,
   but no pattern matching in declarations),
@@ -30,7 +30,11 @@ Distinct features:
   It will be evaluated and the value will be printed.
 
 The BNFC compatible grammar is available in `src/grammar.cf`.
-Examples are available in the `good` directory.
+
+Examples can be found in the following directories:
+- `good/unit` - simple examples, usually for a single feature of the interpreter,
+- `good/complex` - examples using multiple features,
+- `bad` - examples of code that doesn't work.
 
 Using the interpreter
 ---------------------
@@ -49,13 +53,17 @@ To run:
 
 or:
 
-  ./interpreter
+  ./interpreter filename.hs
 
-How to run on students
+Additional flags are available: flag `-t` disables interpreter and prints the
+type of the `main` functoin. Flag `-d` is `dynamic mode` - the type checker is
+not run, only the interpreter.
+
+How to run on `students`
 ----------------------
 
-Running on students requires configuring stack first. Run the following commands
-in the project dir.
+Running on `students` requires configuring stack first. Run the following
+commands in the project dir (this may and probably will take a long time).
 
   export PATH=/home/students/inf/PUBLIC/MRJP/Stack/:$PATH
   stack setup
@@ -63,17 +71,23 @@ in the project dir.
 
 Done.
 
-What has already been implemented
----------------------------------
+What has been implemented
+-------------------------
 
-Python-like interpreter - no type enforcement, but all features listed above.
+The package consists of two de facto separate features - static type checking and
+dynamic interpreter that does not enforce types (both are enabled by default).
+Both parts are implemented, however static type checking misses some important 
+features, so running with option `-d` (dynamic) will give the programmer more
+flexibility.
 
-What is yet to be implemented
------------------------------
+Unimplemented extensions, potentially yet to be done
+----------------------------------------------------
 
-- "make" and "./interpreter" commands as shortcuts to bnfc commands.
-- Type declarations in the grammar.
-- Static type checking including type inference.
-- Friendlier error reporting (e.g. line number)
-- "standard library" including List, Maybe and basic functions
-- `bad` examples
+- Recursion in type checking.
+- Checking whether type and function definitions are not repeated and whether
+  the references to polymorphic variant types have correct number of parameters.
+- Respecting type declarations/type hints like `a :: Int`.
+- Checking whether all cases are matched in `case` expression.
+- More sophisticated "builtins.hs" library including List, Maybe and basic Prelude
+  functions.
+- Syntax sugar for lists.
