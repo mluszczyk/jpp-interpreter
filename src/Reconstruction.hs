@@ -258,6 +258,9 @@ tiDecls env =
         (s2, env'') <- tiDecl env' decl
         return (s1 `composeSubst` s2, env'')
 
+-- type inference on a declaration
+-- returns modified type env and substitution that will be applied
+-- to the let expression containing the declaration if any
 tiDecl :: TypeEnv -> Decl -> TI (Subst, TypeEnv)
 tiDecl env (DValue (Ident x) e1) =
     do  (s1, t1) <- ti env e1
@@ -266,7 +269,7 @@ tiDecl env (DValue (Ident x) e1) =
             env'' = TypeEnv { varsMap = Map.insert x t' (varsMap env')
                             , variantsMap = variantsMap env'
                             }
-        return (s1, env'')
+        return (s1, apply s1 env'')
 
 
 tiDecl env (DData (TDecl (Ident name) args) variants) =
@@ -279,14 +282,14 @@ tiDecl env (DData (TDecl (Ident name) args) variants) =
     go :: [Type] -> Map.Map String Type -> (Subst, TypeEnv) ->
           Variant -> TI (Subst, TypeEnv)
     go freeVars freeVarsMap (s1, env') variant = do
-      (s2, env'') <- declVariant freeVars freeVarsMap env' name argNames variant
-      return (s1 `composeSubst` s2, env'')
+      env'' <- declVariant freeVars freeVarsMap env' name argNames variant
+      return (s1, env'')
 
     unIdent (Ident identName) = identName
 
 
 declVariant :: [Type] -> Map.Map String Type -> TypeEnv ->
-               String -> [String] -> Variant -> TI (Subst, TypeEnv)
+               String -> [String] -> Variant -> TI TypeEnv
 declVariant freeVars _ env typeName paramNames 
             variant@(Var (Ident varName) _) =
     do
@@ -299,7 +302,7 @@ declVariant freeVars _ env typeName paramNames
                             , variantsMap =
                               Map.insert varName typeFunc (variantsMap env')
                             }
-        return (nullSubst, env'')
+        return (env'')
   where
     typeFunc :: () -> TI (Type, [Type])
     typeFunc _ = do

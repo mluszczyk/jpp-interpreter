@@ -25,28 +25,25 @@ myLLexer = myLexer
 
 type Verbosity = Int
 
-putStrV :: Verbosity -> String -> IO ()
-putStrV v s = if v > 1 then putStrLn s else return ()
+runFile :: ([Token] -> Err Program) -> String -> IO b
+runFile p f = readFile f >>= run p
 
-runFile :: Verbosity -> ([Token] -> Err Program) -> String -> IO b
-runFile v p f = readFile f >>= run v p
-
-parse :: (Show b, Print b) => Verbosity -> ([Token] -> Err b) -> String -> IO b
-parse v p s = let ts = myLLexer s in case p ts of
+parse :: (Show b, Print b) => ([Token] -> Err b) -> String -> IO b
+parse p s = let ts = myLLexer s in case p ts of
            Bad message  -> do putStrLn "\nParse              Failed...\n"
-                              putStrV v "Tokens:"
-                              putStrV v $ show ts
+                              putStrLn "Tokens:"
+                              putStrLn $ show ts
                               putStrLn message
                               exitFailure
            Ok  tree -> return tree
 
-run :: Verbosity -> ([Token] -> Err Program) -> String -> IO b
-run v p s = do
+run :: ([Token] -> Err Program) -> String -> IO b
+run p s = do
   builtinsPath <- getDataFileName "data/builtins.hs"
   builtinsFile <- readFile builtinsPath
-  builtinsTree <- parse v p builtinsFile
+  builtinsTree <- parse p builtinsFile
   let sBuiltinsTree = simplify builtinsTree
-  tree <- parse v p s
+  tree <- parse p s
   let sTree = simplify tree
   putStrLn $ show $ testWithBuiltins sBuiltinsTree sTree
   putStrLn $ show (interpretWithBuiltins sBuiltinsTree sTree)
@@ -59,7 +56,6 @@ usage = do
     , "  --help          Display this help message."
     , "  (no arguments)  Parse stdin verbosely."
     , "  (file)          Parse content of files verbosely."
-    , "  -s (file)       Silent mode. Parse content of files silently."
     ]
   exitFailure
 
@@ -68,9 +64,8 @@ main = do
   args <- getArgs
   case args of
     ["--help"] -> usage
-    [] -> hGetContents stdin >>= run 2 pProgram
-    ["-s", path] -> runFile 0 pProgram path
-    [path] -> runFile 2 pProgram path
+    [] -> hGetContents stdin >>= run pProgram
+    [path] -> runFile pProgram path
     _ -> do
             putStrLn "\nIncorrect arguments"
             exitFailure
