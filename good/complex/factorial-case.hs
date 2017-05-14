@@ -1,3 +1,4 @@
+f :: Integer -> Integer;
 f x = case x /= 0 of {
   True -> x * (f (x - 1));
   False -> 1;

@@ -2,6 +2,8 @@
 
 
 data List a = Cons (a) (List a) | Nil ;
+
+sum :: (List Integer) -> Integer ;
 sum t = case t of {
   Nil -> 0 ;
   Cons (a) (rest) -> a + (sum rest)

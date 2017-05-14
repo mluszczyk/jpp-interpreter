@@ -1,4 +1,4 @@
-for x in good/unit/*;
+for x in good/*/*;
 do
   echo $x ;
   ./interpreter -t $x;
