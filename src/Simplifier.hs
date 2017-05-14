@@ -27,6 +27,11 @@ simplifyDecl (AG.DValue name args expr) =
     desugarFunc argsIdents expr' =
       Prelude.foldr AG.ELambda expr' argsIdents
 
+simplifyDecl (AG.DValueWhere name args expr decls) =
+  simplifyDecl (AG.DValue name [] expr')
+  where
+    expr' = AG.ELet (decls ++ [AG.DValue name args expr]) (AG.EVarValue name)
+
 simplifyDecl (AG.DType name typeRef) =
   SG.DType (simplifyValueIdent name) (simplifyTypeRef typeRef)
 simplifyDecl (AG.DData typeDecl variants) =
