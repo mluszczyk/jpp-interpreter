@@ -39,10 +39,29 @@ To build:
 
   stack build
 
+or:
+  
+  make
+
 To run:
 
   stack exec interpreteur-exe filename.hs
 
+or:
+
+  ./interpreter
+
+How to run on students
+----------------------
+
+Running on students requires configuring stack first. Run the following commands
+in the project dir.
+
+  export PATH=/home/students/inf/PUBLIC/MRJP/Stack/:$PATH
+  stack setup
+  stack build
+
+Done.
 
 What has already been implemented
 ---------------------------------
