@@ -16,6 +16,9 @@ import qualified Text.PrettyPrint as PP
 
 import SimpleGrammar
 
+
+intVerboseName = "Integer"
+
 newtype Lit     =  LInt Integer
              deriving (Eq, Ord)
 
@@ -317,10 +320,14 @@ buildConstType typeName typeParams (Var (Ident _) typeRefs) freeVars =
   
 
 transTypeRef :: Map.Map String Type -> TypeRef -> TI Type
-transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs) =
-  do
-    params <- mapM (transTypeRef freeVarsMap) typeRefs
-    return $ TVariant ident params -- todo: check existance and num of parameters
+transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs) 
+  | ident == intVerboseName && not (null typeRefs) =
+      throwError "type Integer does not take parameters"
+  | ident == intVerboseName = return TInt
+  | otherwise = do
+      params <- mapM (transTypeRef freeVarsMap) typeRefs
+      return $ TVariant ident params -- todo: check existance and num of parameters
+
 transTypeRef freeVarsMap (TRValue (Ident ident)) = return $ freeVarsMap Map.! ident
 transTypeRef freeVarsMap (TRFunc typeRef1 typeRef2) =
   do
@@ -367,7 +374,7 @@ instance Show Type where
 
 prType             ::  Type -> PP.Doc
 prType (TVar n)    =   PP.text n
-prType TInt        =   PP.text "Int"
+prType TInt        =   PP.text intVerboseName
 prType (TFun t s)  =   prParenType t PP.<+> PP.text "->" PP.<+> prType s
 prType (TVariant n params) =  PP.text n PP.<+>
                                 PP.hsep (map prType params)
