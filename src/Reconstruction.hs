@@ -1,5 +1,5 @@
 {-
-Algorithm W according to Martin Grabmuller paper.
+Algorithm W according to Martin Grabmuller paper, but heavily modified.
 Available as JPP course material.
 -}
 
@@ -64,12 +64,17 @@ nullSubst  =   Map.empty
 composeSubst         :: Subst -> Subst -> Subst
 composeSubst s1 s2   = Map.map (apply s1) s2 `Map.union` s1
 
--- like env in the interpreter, but stores types (schemes to be precise)
--- rather than values
-data TypeEnv = TypeEnv { varsMap :: Map.Map String Scheme
-                       , variantsMap :: 
-                          Map.Map String (() -> TI (Type, [Type]))
-                       }
+{- type environment
+   varsMap stores the mapping from variable name as it appears in the code to
+   its type
+   variantsMap for each variant type constructor stores a function that generates
+   type of the constructor and types of the constructor parameters with respect
+   to freshly generates type variables
+-}
+data TypeEnv = TypeEnv
+  { varsMap :: Map.Map String Scheme  
+  , variantsMap :: Map.Map String (() -> TI (Type, [Type])) 
+  }
 
 -- remove variable from type env
 remove                    ::  TypeEnv -> String -> TypeEnv
@@ -106,13 +111,14 @@ newTyVar _ =
         put s{tiSupply = tiSupply s + 1}
         return (TVar  ("a" ++ show (tiSupply s)))
 
--- ?
+-- creates a type from a scheme with freshly generated type variables
 instantiate :: Scheme -> TI Type
 instantiate (Scheme vars t) = do  nvars <- mapM (\ _ -> newTyVar ()) vars
                                   let s = Map.fromList (zip vars nvars)
                                   return $ apply s t
 
 -- unification
+-- it returns a substitution which, if applied to both types, makes them equal
 mgu :: Type -> Type -> TI Subst
 mgu (TFun l r) (TFun l' r')  =  do  s1 <- mgu l l'
                                     s2 <- mgu (apply s1 r) (apply s1 r')
@@ -212,7 +218,7 @@ casePartToType _ (PValue (Ident n)) _ = do
   return (var, Map.singleton n var, nullSubst)
 
 casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
-  (cType, cParamTypes) <- getConstType env ident
+  (cType, cParamTypes) <- getConstType
   when (length cParamTypes /= length paramPatterns)
       (throwError $ "parameter number mismatch in case expression " ++
                    "for constructor " ++ ident)
@@ -235,12 +241,12 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
     uniParam subst2 (type1, type2) =
       mgu (apply subst2 type1) (apply subst2 type2)
 
-getConstType :: TypeEnv -> String -> TI (Type, [Type])
-getConstType env consName =
-  maybe 
-    (throwError $ "constructor " ++ consName ++ " undefined")
-    (\x -> x ())
-    (Map.lookup consName (variantsMap env))
+    getConstType :: TI (Type, [Type])
+    getConstType =
+      maybe 
+        (throwError $ "constructor " ++ ident ++ " undefined")
+        (\x -> x ())
+        (Map.lookup ident (variantsMap env))
 
 
 tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
