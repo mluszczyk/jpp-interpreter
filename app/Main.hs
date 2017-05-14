@@ -29,7 +29,7 @@ putStrV :: Verbosity -> String -> IO ()
 putStrV v s = if v > 1 then putStrLn s else return ()
 
 runFile :: Verbosity -> ([Token] -> Err Program) -> String -> IO b
-runFile v p f = putStrLn f >> readFile f >>= run v p
+runFile v p f = readFile f >>= run v p
 
 parse :: (Show b, Print b) => Verbosity -> ([Token] -> Err b) -> String -> IO b
 parse v p s = let ts = myLLexer s in case p ts of
@@ -38,29 +38,19 @@ parse v p s = let ts = myLLexer s in case p ts of
                               putStrV v $ show ts
                               putStrLn message
                               exitFailure
-           Ok  tree -> do putStrLn "\nParse Successful!"
-                          showTree v tree
-                          return tree
+           Ok  tree -> return tree
 
 run :: Verbosity -> ([Token] -> Err Program) -> String -> IO b
 run v p s = do
   builtinsPath <- getDataFileName "data/builtins.hs"
   builtinsFile <- readFile builtinsPath
-  putStrLn "parsing builtins"
   builtinsTree <- parse v p builtinsFile
   let sBuiltinsTree = simplify builtinsTree
-  putStrLn "parsing file"
   tree <- parse v p s
   let sTree = simplify tree
-  testWithBuiltins sBuiltinsTree sTree
+  putStrLn $ show $ testWithBuiltins sBuiltinsTree sTree
   putStrLn $ show (interpretWithBuiltins sBuiltinsTree sTree)
   exitSuccess
-
-showTree :: (Print a, Show a) => Verbosity -> a -> IO ()
-showTree v tree
- = do
-      putStrV v $ "\n[Abstract Syntax]\n\n" ++ show tree
-      putStrV v $ "\n[Linearized tree]\n\n" ++ printTree tree
 
 usage :: IO ()
 usage = do

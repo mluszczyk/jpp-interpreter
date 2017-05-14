@@ -334,11 +334,9 @@ typeInference env1 (Program builtinDecls) (Program decls) =
     e = ELet decls (EVar (Ident "main"))
 
 
-testWithBuiltins :: Program -> Program -> IO ()
+testWithBuiltins :: Program -> Program -> Either String Type
 testWithBuiltins builtinProgram program = 
-    case fst (runTI (typeInference builtinEnv builtinProgram program)) of
-        Left err  ->  putStrLn $ err ++ "\n"
-        Right t   ->  putStrLn $ "Reconstruction: main :: " ++ show t ++ "\n"
+    fst (runTI (typeInference builtinEnv builtinProgram program))
   where 
         builtinEnv = TypeEnv {varsMap = builtins, variantsMap = Map.empty}
         builtins = Map.fromList
