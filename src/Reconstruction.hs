@@ -5,18 +5,18 @@ Available as JPP course material.
 
 module Reconstruction where 
 
+import Data.Maybe ( fromMaybe )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Control.Monad.Except
-import Control.Monad.Reader
 import Control.Monad.State
 
 import qualified Text.PrettyPrint as PP
 
 import SimpleGrammar
 
-data Lit     =  LInt Integer
+newtype Lit     =  LInt Integer
              deriving (Eq, Ord)
 
 data Type    =  TVar String
@@ -42,21 +42,19 @@ instance Types Type where
     ftv (TFun t1 t2)  =  ftv t1 `Set.union` ftv t2
     ftv (TVariant _ params)  =  foldl Set.union Set.empty (map ftv params)
 
-    apply s (TVar n)      =  case Map.lookup n s of
-                               Nothing  -> TVar n
-                               Just t   -> t
-    apply s (TFun t1 t2)  = TFun (apply s t1) (apply s t2)
+    apply s (TVar n)      =  fromMaybe (TVar n) (Map.lookup n s)
+    apply s (TFun t1 t2)  =  TFun (apply s t1) (apply s t2)
     apply _ TInt             =  TInt
-    apply s (TVariant name types) = (TVariant name (map (apply s) types))
+    apply s (TVariant name types) = TVariant name (map (apply s) types)
 
 instance Types Scheme where
-    ftv (Scheme vars t)      =  (ftv t) `Set.difference` (Set.fromList vars)
+    ftv (Scheme vars t)      =  ftv t `Set.difference` Set.fromList vars
 
     apply s (Scheme vars t)  =  Scheme vars (apply (foldr Map.delete s vars) t)
 
 instance Types a => Types [a] where
     apply s  =  map (apply s)
-    ftv l    =  foldr Set.union Set.empty (map ftv l)
+    ftv     =  foldr (Set.union . ftv) Set.empty
 
 type Subst = Map.Map String Type
 
@@ -64,7 +62,7 @@ nullSubst  ::  Subst
 nullSubst  =   Map.empty
 
 composeSubst         :: Subst -> Subst -> Subst
-composeSubst s1 s2   = (Map.map (apply s1) s2) `Map.union` s1
+composeSubst s1 s2   = Map.map (apply s1) s2 `Map.union` s1
 
 -- like env in the interpreter, but stores types (schemes to be precise)
 -- rather than values
@@ -81,16 +79,16 @@ remove envStruct var  =
 
 instance Types TypeEnv where
     ftv env      =  ftv (Map.elems (varsMap env))
-    apply s env  =  TypeEnv { varsMap = (Map.map (apply s) (varsMap env))
+    apply s env  =  TypeEnv { varsMap = Map.map (apply s) (varsMap env)
                             , variantsMap = variantsMap env }
 
 -- converts a type to a scheme by fetching all variables not bound by env
 generalize        ::  TypeEnv -> Type -> Scheme
 generalize env t  =   Scheme vars t
-  where vars = Set.toList ((ftv t) `Set.difference` (ftv env))
+  where vars = Set.toList (ftv t `Set.difference` ftv env)
 
 -- tiSupply - variable counter used to create new varaibles
-data TIState = TIState { tiSupply :: Int }
+newtype TIState = TIState { tiSupply :: Int }
 
 -- state is for the variable counter
 -- except is for unification errors
@@ -102,15 +100,15 @@ runTI t =
   where initTIState = TIState{tiSupply = 0}
 
 -- create type variable
-newTyVar :: String -> TI Type
-newTyVar prefix =
+newTyVar :: () -> TI Type
+newTyVar _ =
     do  s <- get
         put s{tiSupply = tiSupply s + 1}
-        return (TVar  (prefix ++ show (tiSupply s)))
+        return (TVar  ("a" ++ show (tiSupply s)))
 
 -- ?
 instantiate :: Scheme -> TI Type
-instantiate (Scheme vars t) = do  nvars <- mapM (\ _ -> newTyVar "a") vars
+instantiate (Scheme vars t) = do  nvars <- mapM (\ _ -> newTyVar ()) vars
                                   let s = Map.fromList (zip vars nvars)
                                   return $ apply s t
 
@@ -158,17 +156,17 @@ ti env (EVar (Ident ident)) =
 ti _ (EInt integer) = tiLit (LInt integer)
 
 ti env (ELambda (Ident n) e) =
-    do  tv <- newTyVar "a"
+    do  tv <- newTyVar ()
         let env' = remove env n
             env'' = TypeEnv
-              { varsMap = (varsMap env') 
-                    `Map.union` (Map.singleton n (Scheme [] tv))
+              { varsMap = varsMap env'
+                    `Map.union` Map.singleton n (Scheme [] tv)
               , variantsMap = variantsMap env'
               }
         (s1, t1) <- ti env'' e
         return (s1, TFun (apply s1 tv) t1)
 ti env expr@(EApp e1 e2) =
-    do  tv <- newTyVar "a"
+    do  tv <- newTyVar ()
         (s1, t1) <- ti env e1
         (s2, t2) <- ti (apply s1 env) e2
         s3 <- mgu (apply s2 t1) (TFun t2 tv)
@@ -183,19 +181,19 @@ ti env (ELet decls e) =
 
 ti env (ECase expr caseParts) = do
     (subst, exprType) <- ti env expr
-    resultType <- newTyVar "a"
+    resultType <- newTyVar ()
     (s, _, t) <- foldM go (subst, exprType, resultType) caseParts
     return (s, t)
 
   where 
-    go (s1, exprType, resultType) (CaseP pattern result) = do
-          (patternType, varMap, s2) <- casePartToType env pattern s1
+    go (s1, exprType, resultType) (CaseP patt result) = do
+          (patternType, varMap, s2) <- casePartToType env patt s1
           s3 <- mgu patternType (apply s2 exprType)
           let envMapUpdate = Map.map (Scheme []) varMap
           (s4, resultType') <- ti (apply (s3 `composeSubst` s2)
-              (TypeEnv { varsMap = envMapUpdate `Map.union` (varsMap env)
-                       , variantsMap = variantsMap env
-                       })) result
+              TypeEnv { varsMap = envMapUpdate `Map.union` varsMap env
+                      , variantsMap = variantsMap env
+                      }) result
           s5 <- mgu (apply (
             s4 `composeSubst` s3 `composeSubst` s2
             ) resultType) resultType'
@@ -205,12 +203,12 @@ ti env (ECase expr caseParts) = do
 
 casePartToType :: TypeEnv -> Pattern -> Subst -> 
                   TI (Type, Map.Map String Type, Subst)
-casePartToType _ (PAny) _ = do
-  var <- newTyVar "a"
+casePartToType _ PAny _ = do
+  var <- newTyVar ()
   return (var, Map.empty, nullSubst)
 
 casePartToType _ (PValue (Ident n)) _ = do
-  var <- newTyVar "a"
+  var <- newTyVar ()
   return (var, Map.singleton n var, nullSubst)
 
 casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
@@ -227,8 +225,8 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
          , subst4 `composeSubst` subst3 `composeSubst` 
            subst1)
   where
-    goParam (prevTypes, prevVars, subst2) pattern = do
-            (patternType, patternVars, subst3) <- casePartToType env pattern subst2
+    goParam (prevTypes, prevVars, subst2) patt = do
+            (patternType, patternVars, subst3) <- casePartToType env patt subst2
             return ( prevTypes ++ [patternType]
                    , prevVars `Map.union` patternVars 
                       -- todo: errors on conflicts in union
@@ -241,13 +239,13 @@ getConstType :: TypeEnv -> String -> TI (Type, [Type])
 getConstType env consName =
   maybe 
     (throwError $ "constructor " ++ consName ++ " undefined")
-    (\x -> do x ())
+    (\x -> x ())
     (Map.lookup consName (variantsMap env))
 
 
 tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
-tiDecls env decls =
-  foldM go (nullSubst, env) decls
+tiDecls env =
+  foldM go (nullSubst, env)
     where
       go :: (Subst, TypeEnv) -> Decl -> TI (Subst, TypeEnv)
       go (s1, env') decl = do
@@ -267,12 +265,12 @@ tiDecl env (DValue (Ident x) e1) =
 
 tiDecl env (DData (TDecl (Ident name) args) variants) =
   do
-    freeVars <- mapM (newTyVar) (map (const "a") args)
+    freeVars <- mapM (newTyVar . const ()) args
     let freeVarsMap = Map.fromList (zip argNames freeVars)
     foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
   where
     argNames = map unIdent args
-    go :: [Type] -> (Map.Map String Type) -> (Subst, TypeEnv) ->
+    go :: [Type] -> Map.Map String Type -> (Subst, TypeEnv) ->
           Variant -> TI (Subst, TypeEnv)
     go freeVars freeVarsMap (s1, env') variant = do
       (s2, env'') <- declVariant freeVars freeVarsMap env' name argNames variant
@@ -281,10 +279,10 @@ tiDecl env (DData (TDecl (Ident name) args) variants) =
     unIdent (Ident identName) = identName
 
 
-declVariant :: [Type] -> (Map.Map String Type) -> TypeEnv ->
+declVariant :: [Type] -> Map.Map String Type -> TypeEnv ->
                String -> [String] -> Variant -> TI (Subst, TypeEnv)
 declVariant freeVars _ env typeName paramNames 
-            variant@(Var (Ident varName) typeRefs) =
+            variant@(Var (Ident varName) _) =
     do
         (baseType, paramTypes) <- buildConstType typeName paramNames variant freeVars
         let t = foldl (flip TFun) baseType (reverse paramTypes)
@@ -299,17 +297,17 @@ declVariant freeVars _ env typeName paramNames
   where
     typeFunc :: () -> TI (Type, [Type])
     typeFunc _ = do
-      newFreeVars <- mapM (const (newTyVar "a")) freeVars
+      newFreeVars <- mapM (const (newTyVar ())) freeVars
       buildConstType typeName paramNames variant newFreeVars
 
 buildConstType :: String -> [String] -> Variant -> [Type] -> TI (Type, [Type])
-buildConstType typeName typeParams (Var (Ident varName) typeRefs) freeVars =
+buildConstType typeName typeParams (Var (Ident _) typeRefs) freeVars =
   let freeVarsMap = Map.fromList (zip typeParams freeVars) in do
     paramTypes <- mapM (transTypeRef freeVarsMap) typeRefs
     return (TVariant typeName freeVars, paramTypes)
   
 
-transTypeRef :: (Map.Map String Type) -> TypeRef -> TI Type
+transTypeRef :: Map.Map String Type -> TypeRef -> TI Type
 transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs) =
   do
     params <- mapM (transTypeRef freeVarsMap) typeRefs
