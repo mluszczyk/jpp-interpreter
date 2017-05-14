@@ -19,7 +19,7 @@ Similarities to Haskell:
 - pattern matching on variant types (only in the `case` statement, 
   but not in function declarations),
 - recursive inc. mutually recursive functions, data types and values 
-  (infinite lists as in Haskell), this only works in the `-d` mode currently,
+  (infinite lists as in Haskell),
 - language constructs like `let`, `where`, anonymous functions (one parameter only),
   named functions (support multiple parameters,
   but no pattern matching in declarations),
@@ -28,6 +28,7 @@ Similarities to Haskell:
 Distinct features:
 - IO () and String are not supported, so main is just meant to be any expression. 
   It will be evaluated and the value will be printed.
+- Recursive functions must be type hinted using `f :: Type` syntax.
 
 The BNFC compatible grammar is available in `src/grammar.cf`.
 
@@ -83,10 +84,10 @@ flexibility.
 Unimplemented extensions, potentially yet to be done
 ----------------------------------------------------
 
-- Recursion in type checking.
+- Extended type inference so that it supports recursion without type hinting.
 - Checking whether type and function definitions are not repeated and whether
-  the references to polymorphic variant types have correct number of parameters.
-- Respecting type declarations/type hints like `a :: Int`.
+  the references to polymorphic variant types have correct number of parameters
+  and whether type hints match definitions.
 - Checking whether all cases are matched in `case` expression.
 - More sophisticated "builtins.hs" library including List, Maybe and basic Prelude
   functions.
