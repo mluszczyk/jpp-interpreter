@@ -1,5 +1,5 @@
 all:
-	stack build --ghc-options=-Wall
+	stack build --ghc-options="-Wall -Werror"
 
 
 clean:
