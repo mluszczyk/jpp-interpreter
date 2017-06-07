@@ -406,7 +406,7 @@ prType (TVar n)    =   PP.text n
 prType TInt        =   PP.text intVerboseName
 prType (TFun t s)  =   prParenType t PP.<+> PP.text "->" PP.<+> prType s
 prType (TVariant n params) =  PP.text n PP.<+>
-                                PP.hsep (map prType params)
+                                PP.hsep (map prParenType params)
 
 prParenType     ::  Type -> PP.Doc
 prParenType  t  =   case t of
