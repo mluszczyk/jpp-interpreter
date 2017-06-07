@@ -6,6 +6,7 @@ Available as JPP course material.
 module Reconstruction where 
 
 import Data.Maybe ( fromMaybe )
+import Data.List ( nub )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -277,13 +278,24 @@ tiDecl env (DValue (Ident x) e1) =
 
 
 tiDecl env (DType (Ident name) typeRef) = do
-  t <- transTypeRef (Map.empty) typeRef
+  let dupVars = typeVariables typeRef
+  let uniqVars = nub dupVars
+  freeVars <- mapM (newTyVar . const ()) uniqVars
+  let freeVarsMap = Map.fromList (zip uniqVars freeVars)
+  t <- transTypeRef freeVarsMap typeRef
   let env' = remove env name
       s = generalize env t
       env'' = TypeEnv { varsMap = Map.insert name s (varsMap env')
                       , variantsMap = variantsMap env'
                       }
   return (nullSubst, env'')
+  where
+    typeVariables :: TypeRef -> [String]
+    typeVariables (TRVariant _ refs) =
+      concatMap typeVariables refs
+    typeVariables (TRValue (Ident iName)) = [iName]
+    typeVariables (TRFunc ref1 ref2) =
+      typeVariables ref1 ++ typeVariables ref2
 
 
 tiDecl env (DData (TDecl (Ident name) args) variants) =
@@ -316,7 +328,7 @@ declVariant freeVars _ env typeName paramNames
                             , variantsMap =
                               Map.insert varName typeFunc (variantsMap env')
                             }
-        return (env'')
+        return env''
   where
     typeFunc :: () -> TI (Type, [Type])
     typeFunc _ = do
