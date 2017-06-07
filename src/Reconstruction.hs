@@ -199,18 +199,23 @@ ti env (ECase expr caseParts) = do
   where 
     go (s1, exprType, resultType) (CaseP patt result) = do
           (patternType, varMap, s2) <- casePartToType env patt s1
-          s3 <- mgu patternType (apply s2 exprType)
-          let envMapUpdate = Map.map (Scheme []) varMap
-          (s4, resultType') <- ti (apply (s3 `composeSubst` s2)
+          s3 <- mgu patternType (apply (s2 `composeSubst` s1) exprType)
+          let envMapUpdate = Map.map (Scheme []) (Map.map (apply s3) varMap)
+          (s4, resultType') <- ti (apply (s3 `composeSubst` s2 `composeSubst` s1)
               TypeEnv { varsMap = envMapUpdate `Map.union` varsMap env
                       , variantsMap = variantsMap env
                       }) result
           s5 <- mgu (apply (
-            s4 `composeSubst` s3 `composeSubst` s2
+            s4 `composeSubst` s3 `composeSubst` s2 `composeSubst` s1
             ) resultType) resultType'
-          return (s5 `composeSubst` s4 `composeSubst` s3 `composeSubst` s2 `composeSubst` s1
-                 , apply (s5 `composeSubst` s4 `composeSubst` s3 `composeSubst` s2) exprType
-                 , apply (s5 `composeSubst` s4 `composeSubst` s3 `composeSubst` s2) resultType')
+          return (s5 `composeSubst` s4 `composeSubst`
+                  s3 `composeSubst` s2 `composeSubst` s1
+                 , apply (s5 `composeSubst` s4 `composeSubst`
+                          s3 `composeSubst` s2 `composeSubst`
+                          s1) exprType
+                 , apply (s5 `composeSubst` s4 `composeSubst`
+                          s3 `composeSubst` s2 `composeSubst`
+                          s1) resultType')
 
 casePartToType :: TypeEnv -> Pattern -> Subst -> 
                   TI (Type, Map.Map String Type, Subst)
@@ -243,8 +248,9 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
                       -- todo: errors on conflicts in union
                    , subst3)
     uniParam :: Subst -> (Type, Type) -> TI Subst
-    uniParam subst2 (type1, type2) =
-      mgu (apply subst2 type1) (apply subst2 type2)
+    uniParam subst2 (type1, type2) = do
+      subst3 <- mgu (apply subst2 type1) (apply subst2 type2)
+      return $ subst3 `composeSubst` subst2
 
     getConstType :: TI (Type, [Type])
     getConstType =
