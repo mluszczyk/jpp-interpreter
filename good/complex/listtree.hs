@@ -3,7 +3,7 @@ sum a b = a + b ;
 
 data ListTree a = LTNode a (List (ListTree a));
 
-foldListTree :: (b -> (a -> b)) -> (b -> ((ListTree a) -> b));
+foldListTree :: (b -> a -> b) -> b -> (ListTree a) -> b;
 foldListTree func val tree = case tree of {
   LTNode a children -> foldl (foldListTree func) (func val a) children
 };

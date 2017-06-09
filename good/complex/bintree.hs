@@ -1,6 +1,6 @@
 data BinTree a = BinNode a (BinTree a) (BinTree a) | BinLeaf;
 
-foldBinTree :: (b -> (a -> b)) -> (b -> ((BinTree a) -> b));
+foldBinTree :: (b -> a -> b) -> b -> (BinTree a) -> b;
 foldBinTree func val tree = case tree of {
   BinLeaf -> val;
   BinNode a left right ->

@@ -162,7 +162,7 @@ TypeRef :: { TypeRef }
 TypeRef : TypeIdent ListTypeRef1 { AbsGrammar.TRVariant $1 $2 }
         | TypeRef1 { $1 }
 TypeRef1 :: { TypeRef }
-TypeRef1 : TypeRef1 '->' TypeRef2 { AbsGrammar.TRFunc $1 $3 }
+TypeRef1 : TypeRef2 '->' TypeRef1 { AbsGrammar.TRFunc $1 $3 }
          | TypeRef2 { $1 }
 TypeRef2 :: { TypeRef }
 TypeRef2 : ValueIdent { AbsGrammar.TRValue $1 }

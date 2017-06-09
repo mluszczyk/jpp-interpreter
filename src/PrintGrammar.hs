@@ -150,7 +150,7 @@ instance Print TypeDecl where
 instance Print TypeRef where
   prt i e = case e of
     TRVariant typeident typerefs -> prPrec i 0 (concatD [prt 0 typeident, prt 1 typerefs])
-    TRFunc typeref1 typeref2 -> prPrec i 1 (concatD [prt 1 typeref1, doc (showString "->"), prt 2 typeref2])
+    TRFunc typeref1 typeref2 -> prPrec i 1 (concatD [prt 2 typeref1, doc (showString "->"), prt 1 typeref2])
     TRValue valueident -> prPrec i 2 (concatD [prt 0 valueident])
     TRSimpleVariant typeident -> prPrec i 2 (concatD [prt 0 typeident])
   prtList 1 [x] = (concatD [prt 1 x])

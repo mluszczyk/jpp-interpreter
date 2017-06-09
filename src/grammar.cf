@@ -55,7 +55,7 @@ separator ValueIdent "" ;
 -- e.g. `Blah a b c`
 
 TRVariant. TypeRef ::= TypeIdent [TypeRef1] ;
-TRFunc. TypeRef1 ::= TypeRef1 "->" TypeRef2 ;
+TRFunc. TypeRef1 ::= TypeRef2 "->" TypeRef1 ;
 TRValue. TypeRef2 ::= ValueIdent ;
 TRSimpleVariant. TypeRef2 ::= TypeIdent ;
 coercions TypeRef 2;

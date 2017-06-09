@@ -19,7 +19,7 @@ hasBuiltins_ = True;
 
 data List a = Cons a (List a) | Nil;
 
-take :: Integer -> ((List a) -> (List a));
+take :: Integer -> (List a) -> (List a);
 take n l =
   if n == 0 then Nil else case l of {
     Nil -> Nil ;
@@ -33,14 +33,14 @@ length a = case a of {
 };
 
 
-foldl :: (b -> (a -> b)) -> (b -> ((List a) -> b));
+foldl :: (b -> (a -> b)) -> b -> (List a) -> b;
 foldl func val list = case list of {
  Nil -> val;
  Cons a rest -> foldl func (func val a) rest;
 };
 
 
-map :: (a -> b) -> ((List a) -> (List b));
+map :: (a -> b) -> (List a) -> (List b);
 map func list = case list of {
   Nil -> Nil;
   Cons a rest -> Cons (func a) (map func rest)

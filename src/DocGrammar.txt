@@ -109,7 +109,7 @@ All other symbols are terminals.
   |  |  **|**  | //ValueIdent// //[ValueIdent]// 
   | //TypeRef// | -> | //TypeIdent// //[TypeRef1]// 
   |  |  **|**  | //TypeRef1// 
-  | //TypeRef1// | -> | //TypeRef1// ``->`` //TypeRef2// 
+  | //TypeRef1// | -> | //TypeRef2// ``->`` //TypeRef1// 
   |  |  **|**  | //TypeRef2// 
   | //TypeRef2// | -> | //ValueIdent// 
   |  |  **|**  | //TypeIdent// 
