@@ -7,15 +7,39 @@ import Data.Map as M
 import SimpleGrammar
 import ErrM
 import Data.Maybe (fromMaybe, mapMaybe)
+import qualified Text.PrettyPrint as PP
+
 type Result = Err Value
 
 data Value = Const Integer | Func (Result -> Result) |
     Variant String [Result]
 
-instance Show Value where
-  show (Const n) = "Const " ++ show n
-  show (Func _) = "Func"
-  show (Variant s d) = "Variant " ++ s ++ show d
+instance Show DisplayValue where
+  show x = show (prValue x)
+
+prValue :: DisplayValue -> PP.Doc
+prValue (DisplayConst n) = PP.text (show n)
+prValue (DisplayFunc) = PP.text "function"
+prValue (DisplayVariant s d) =
+  PP.text s PP.<+> PP.hsep (Prelude.map prParenValue d)
+
+prParenValue :: DisplayValue -> PP.Doc
+prParenValue t@(DisplayVariant _ d) | length d > 0 = PP.parens (prValue t)
+prParenValue t = prValue t
+
+data DisplayValue = DisplayConst Integer
+                  | DisplayFunc
+                  | DisplayVariant String [DisplayValue];
+resultToDisplay :: Result -> Err DisplayValue
+resultToDisplay res = do
+  val <- res
+  case val of
+    Const n -> return $ DisplayConst n
+    Func _ -> return DisplayFunc
+    Variant s d -> do
+      displayD <- mapM resultToDisplay d
+      return $ DisplayVariant s displayD
+
 
 type Env = M.Map String (Err Value)
 
@@ -64,13 +88,13 @@ transExp env x = case x of
         f argRes
       _ -> Bad "cannot apply to a constant"
   ECase expr caseParts ->
-    let 
+    let
       matchSubpatterns :: Env -> [Result] -> [Pattern] -> Maybe (Err Env)
       matchSubpatterns env' results patterns =
         if length results /= length patterns
           then Just $ Bad "number of variant args does not match"
-          else Prelude.foldl go (Just $ Ok env') (zip results patterns) 
-            where 
+          else Prelude.foldl go (Just $ Ok env') (zip results patterns)
+            where
               go :: Maybe (Err Env) -> (Result, Pattern) -> Maybe (Err Env)
               go Nothing _ = Nothing
               go (Just (Bad  s)) _ = Just $ Bad s
@@ -84,15 +108,15 @@ transExp env x = case x of
         Just $ Ok $ insert str (Ok value) env'
       matchPattern env' value (PVariant (Ident exprectedName) patterns) =
         case value of
-          Variant variantName variantData -> 
+          Variant variantName variantData ->
             if variantName == exprectedName
               then matchSubpatterns env' variantData patterns
               else Nothing
-          _ -> Just $ Bad $ 
-            "you cannot match case with non variant value" ++ show value
+          _ -> Just $ Bad $
+            "you cannot match case with non variant value"
 
       matchCasePart :: Value -> CasePart -> Maybe Result
-      matchCasePart value (CaseP pat thenExp) = 
+      matchCasePart value (CaseP pat thenExp) =
         case matchPattern env value pat of
           Just (Ok env') -> Just $ transExp env' thenExp
           Just (Bad b) -> Just (Bad b)
@@ -100,12 +124,12 @@ transExp env x = case x of
     in do
       val <- transExp env expr
       let matches = Data.Maybe.mapMaybe (matchCasePart val) caseParts
-      case matches of 
+      case matches of
         [] -> Bad "exhausted pattern matching"
         (a:_) -> a
 
 specialBuiltins :: Env
-specialBuiltins = fromList 
+specialBuiltins = fromList
   [ ("+", arithmBuiltin (+))
   , ("-", arithmBuiltin (-))
   , ("*", arithmBuiltin (*))
@@ -132,10 +156,10 @@ specialBuiltins = fromList
         checkIntFunc _ _ = Bad "unsupported non-integer argument for arithmetic operation"
 
     division = binaryIntFuncWrapper foo
-      where 
+      where
         foo _ i2 | i2 == 0 = Bad "division by 0"
         foo i1 i2 = Ok $ Const (i1 `div` i2)
-  
+
     arithmBuiltin :: (Integer -> Integer -> Integer) -> Result
     arithmBuiltin op = binaryIntFuncWrapper foo
       where
@@ -143,7 +167,7 @@ specialBuiltins = fromList
 
     boolBuiltin :: (Integer -> Integer -> Bool) -> Result
     boolBuiltin op = binaryIntFuncWrapper foo
-      where 
+      where
         foo i1 i2  = Ok $ boolToLang (i1 `op` i2)
 
     boolToLang :: Bool -> Value
@@ -151,11 +175,12 @@ specialBuiltins = fromList
     boolToLang True = Variant "True" []
 
 
-interpretWithBuiltins :: Program -> Program -> Result
+interpretWithBuiltins :: Program -> Program -> Err DisplayValue
 interpretWithBuiltins (Program builtinsDecls) (Program programDecls) =
     do
       builtinEnv <- transDecls specialBuiltins builtinsDecls
-      transExp builtinEnv expr
+      res <- transExp builtinEnv expr
+      resultToDisplay (Ok res)
   where
     expr = ELet programDecls (EVar (Ident "main"))
 
