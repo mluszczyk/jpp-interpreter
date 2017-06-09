@@ -144,15 +144,16 @@ ListCasePart : {- empty -} { [] }
              | CasePart { (:[]) $1 }
              | CasePart ';' ListCasePart { (:) $1 $3 }
 Pattern :: { Pattern }
-Pattern : TypeIdent ListPattern1 { AbsGrammar.PVariant $1 (reverse $2) }
+Pattern : TypeIdent ListPattern1 { AbsGrammar.PVariant $1 $2 }
         | Pattern1 { $1 }
 Pattern1 :: { Pattern }
-Pattern1 : ValueIdent { AbsGrammar.PValue $1 }
+Pattern1 : TypeIdent { AbsGrammar.PSimpleVariant $1 }
+         | ValueIdent { AbsGrammar.PValue $1 }
          | '_' { AbsGrammar.PAny }
          | '(' Pattern ')' { $2 }
 ListPattern1 :: { [Pattern] }
-ListPattern1 : {- empty -} { [] }
-             | ListPattern1 Pattern1 { flip (:) $1 $2 }
+ListPattern1 : Pattern1 { (:[]) $1 }
+             | Pattern1 ListPattern1 { (:) $1 $2 }
 TypeDecl :: { TypeDecl }
 TypeDecl : TypeIdent ListValueIdent { AbsGrammar.TDecl $1 $2 }
 ListValueIdent :: { [ValueIdent] }

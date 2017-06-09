@@ -48,7 +48,10 @@ data CasePart = CaseP Pattern Exp
   deriving (Eq, Ord, Show, Read)
 
 data Pattern
-    = PVariant TypeIdent [Pattern] | PValue ValueIdent | PAny
+    = PVariant TypeIdent [Pattern]
+    | PSimpleVariant TypeIdent
+    | PValue ValueIdent
+    | PAny
   deriving (Eq, Ord, Show, Read)
 
 data TypeDecl = TDecl TypeIdent [ValueIdent]

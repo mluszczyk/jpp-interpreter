@@ -104,3 +104,5 @@ simplifyPattern (AG.PVariant typeIdent patterns) =
 simplifyPattern (AG.PValue valueIdent) =
   SG.PValue (simplifyValueIdent valueIdent)
 simplifyPattern AG.PAny = SG.PAny
+simplifyPattern (AG.PSimpleVariant typeIdent) =
+  SG.PVariant (simplifyTypeIdent typeIdent) []

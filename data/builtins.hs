@@ -46,5 +46,21 @@ map func list = case list of {
   Cons a rest -> Cons (func a) (map func rest)
 };
 
+data Pair a b = Pair a b;
 
+fst p = case p of {
+  Pair a _ -> a
+};
+
+snd p = case p of {
+  Pair _ b -> b
+};
+
+
+zip :: (List a) -> (List b) -> (List (Pair a b) );
+zip a b = case (Pair a b) of {
+  Pair Nil _ -> Nil;
+  Pair _ Nil -> Nil;
+  Pair (Cons a ta) (Cons b tb) -> Cons (Pair a b) (zip ta tb);
+};
 

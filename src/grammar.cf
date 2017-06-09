@@ -45,10 +45,11 @@ CaseP. CasePart ::= Pattern "->" Exp;
 separator CasePart ";" ;
 
 PVariant. Pattern ::= TypeIdent [Pattern1] ;
+PSimpleVariant. Pattern1 ::= TypeIdent ;
 PValue. Pattern1 ::= ValueIdent ;
 PAny. Pattern1 ::= "_" ;
 coercions Pattern 1 ;
-separator Pattern1 "" ;
+separator nonempty Pattern1 "" ;
 
 TDecl. TypeDecl ::= TypeIdent [ValueIdent] ;
 separator ValueIdent "" ;

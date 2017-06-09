@@ -99,10 +99,11 @@ All other symbols are terminals.
   |  |  **|**  | //CasePart// ``;`` //[CasePart]// 
   | //Pattern// | -> | //TypeIdent// //[Pattern1]// 
   |  |  **|**  | //Pattern1// 
-  | //Pattern1// | -> | //ValueIdent// 
+  | //Pattern1// | -> | //TypeIdent// 
+  |  |  **|**  | //ValueIdent// 
   |  |  **|**  | ``_`` 
   |  |  **|**  | ``(`` //Pattern// ``)`` 
-  | //[Pattern1]// | -> | **eps**
+  | //[Pattern1]// | -> | //Pattern1// 
   |  |  **|**  | //Pattern1// //[Pattern1]// 
   | //TypeDecl// | -> | //TypeIdent// //[ValueIdent]// 
   | //[ValueIdent]// | -> | **eps**

@@ -4,3 +4,7 @@ all:
 
 clean:
 	stack clean
+
+
+bnfc:
+	bash runbnfc.sh
