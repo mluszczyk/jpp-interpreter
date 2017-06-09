@@ -24,6 +24,9 @@ transConstructor name [] results = Variant name results
 transConstructor name (_:rest) results =
   Func (\r -> Ok $ transConstructor name rest (results ++ [r]))
 
+-- evalEnv is the fixed point of the environment, the expressions are
+-- evaluated in evalEnv. envStub is an accumulator for foldM and this value
+-- is updated and then returned.
 transDecl :: Env -> Env -> Decl -> Err Env
 transDecl evalEnv envStub (DValue (Ident name) expr) =
   Ok $ insert name (transExp evalEnv expr) envStub
