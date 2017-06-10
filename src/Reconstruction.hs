@@ -3,10 +3,10 @@ Algorithm W according to Martin Grabmuller paper, but heavily modified.
 The original version is available as JPP course material.
 -}
 
-module Reconstruction where 
+module Reconstruction where
 
 import Data.Maybe ( fromMaybe )
-import Data.List ( nub, delete )
+import Data.List ( nub, delete, intercalate )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -218,7 +218,7 @@ addScheme env (name, scheme) =
     TypeEnv { varsMap = Map.insert name scheme (varsMap env)
             , variantsMap = variantsMap env }
 
-casePartToType :: TypeEnv -> Pattern -> Subst -> 
+casePartToType :: TypeEnv -> Pattern -> Subst ->
                   TI (Type, Map.Map String Type, Subst)
 casePartToType _ PAny _ = do
   var <- newTyVar ()
@@ -233,19 +233,19 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
   when (length cParamTypes /= length paramPatterns)
       (throwError $ "parameter number mismatch in case expression " ++
                    "for constructor " ++ ident)
-  (paramTypes, vars, subst3) <- 
+  (paramTypes, vars, subst3) <-
     foldM goParam ([], Map.empty, subst1) paramPatterns
-  
+
   subst4 <- foldM uniParam subst3 (zip cParamTypes paramTypes)
 
   return (apply (subst4 `composeSubst` subst3) cType, vars
-         , subst4 `composeSubst` subst3 `composeSubst` 
+         , subst4 `composeSubst` subst3 `composeSubst`
            subst1)
   where
     goParam (prevTypes, prevVars, subst2) patt = do
             (patternType, patternVars, subst3) <- casePartToType env patt subst2
             return ( prevTypes ++ [patternType]
-                   , prevVars `Map.union` patternVars 
+                   , prevVars `Map.union` patternVars
                       -- todo: errors on conflicts in union
                    , subst3)
     uniParam :: Subst -> (Type, Type) -> TI Subst
@@ -255,7 +255,7 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
 
     getConstType :: TI (Type, [Type])
     getConstType =
-      maybe 
+      maybe
         (throwError $ "constructor " ++ ident ++ " undefined")
         (\x -> x ())
         (Map.lookup ident (variantsMap env))
@@ -263,13 +263,16 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
 
 tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
 tiDecls env decls =
-  do (s, e, _) <- foldM go (nullSubst, env, []) decls
-     return (s, e)
-    where
-      go :: (Subst, TypeEnv, [String]) -> Decl -> TI (Subst, TypeEnv, [String])
-      go (s1, env', undef) decl = do
-        (s2, env'', undef') <- tiDecl env' decl undef
-        return (s1 `composeSubst` s2, env'', undef')
+  do (s, e, undefList) <- foldM go (nullSubst, env, []) decls
+     if not (null undefList) then
+       throwError $ "declared type, but undefined " ++ intercalate ", " undefList
+     else
+       return (s, e)
+  where
+    go :: (Subst, TypeEnv, [String]) -> Decl -> TI (Subst, TypeEnv, [String])
+    go (s1, env', undef) decl = do
+      (s2, env'', undef') <- tiDecl env' decl undef
+      return (s1 `composeSubst` s2, env'', undef')
 
 -- type inference on a declaration
 -- returns modified type env and substitution that will be applied
@@ -281,7 +284,7 @@ tiDecl env (DValue (Ident x) e1) undefList =
   enhanceErrorStack ("delcaration of " ++ x) $
     do  (s1, t1) <- ti env e1
         let t' = generalize (apply s1 env) t1
-        if elem x undefList then  
+        if elem x undefList then
           -- todo: check if the type matches type declaration
           return (s1, apply s1 env, delete x undefList)
         else do
@@ -311,11 +314,11 @@ tiDecl env (DType (Ident name) typeRef) undefList =
 
 
 tiDecl env (DData (TDecl (Ident name) args) variants) undefList =
-  enhanceErrorStack ("declaration of type " ++ name) $ 
+  enhanceErrorStack ("declaration of type " ++ name) $
     do
       freeVars <- mapM (newTyVar . const ()) args
       let freeVarsMap = Map.fromList (zip argNames freeVars)
-      (s, t) <- foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
+      (s, t) <- foldM (go freeVars freeVarsMap) (nullSubst, env) variants
       return (s, t, undefList)
   where
     argNames = map unIdent args
@@ -330,7 +333,7 @@ tiDecl env (DData (TDecl (Ident name) args) variants) undefList =
 
 declVariant :: [Type] -> Map.Map String Type -> TypeEnv ->
                String -> [String] -> Variant -> TI TypeEnv
-declVariant freeVars _ env typeName paramNames 
+declVariant freeVars _ env typeName paramNames
             variant@(Var (Ident varName) _) =
     do
         (baseType, paramTypes) <- buildConstType typeName paramNames variant freeVars
@@ -354,10 +357,10 @@ buildConstType typeName typeParams (Var (Ident _) typeRefs) freeVars =
   let freeVarsMap = Map.fromList (zip typeParams freeVars) in do
     paramTypes <- mapM (transTypeRef freeVarsMap) typeRefs
     return (TVariant typeName freeVars, paramTypes)
-  
+
 
 transTypeRef :: Map.Map String Type -> TypeRef -> TI Type
-transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs) 
+transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs)
   | ident == intVerboseName && not (null typeRefs) =
       throwError "type Integer does not take parameters"
   | ident == intVerboseName = return TInt
@@ -375,7 +378,7 @@ transTypeRef freeVarsMap (TRFunc typeRef1 typeRef2) =
 -- running the inference algorithm
 typeInference :: TypeEnv -> Program -> Program -> TI Type
 typeInference env1 (Program builtinDecls) (Program decls) =
-  do 
+  do
     (s1, env2) <- enhanceErrorStack "builtins" (tiDecls env1 builtinDecls)
     let env3 = apply s1 env2
     (s2, t) <- ti env3 e
@@ -393,9 +396,9 @@ enhanceErrorStack item errorExpr =
 
 
 testWithBuiltins :: Program -> Program -> Either String Type
-testWithBuiltins builtinProgram program = 
+testWithBuiltins builtinProgram program =
     fst (runTI (typeInference builtinEnv builtinProgram program))
-  where 
+  where
         builtinEnv = TypeEnv {varsMap = builtins, variantsMap = Map.empty}
         builtins = Map.fromList
                     [ ("+", intIntInt)
@@ -439,7 +442,7 @@ instance Show Scheme where
 
 prScheme                  ::  Scheme -> PP.Doc
 prScheme (Scheme vars t)  =   PP.text "All" PP.<+>
-                              PP.hcat 
+                              PP.hcat
                                 (PP.punctuate PP.comma (map PP.text vars))
                               PP.<> PP.text "." PP.<+> prType t
 
