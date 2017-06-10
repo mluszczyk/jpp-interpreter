@@ -3,7 +3,7 @@
 module Interpreter where
 
 import Control.Monad
-import Data.Map as M
+import qualified Data.Map as Map
 import SimpleGrammar
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Text.PrettyPrint as PP
@@ -41,7 +41,7 @@ resultToDisplay res = do
       return $ DisplayVariant s displayD
 
 
-type Env = M.Map String Result
+type Env = Map.Map String Result
 
 transConstructor :: String -> [a] -> [Result] -> Value
 transConstructor name [] results = Variant name results
@@ -58,7 +58,7 @@ appendToContext (Context items) str = Context (str:items)
 -- is updated and then returned.
 transDecl :: Context -> Env -> Env -> Decl -> PResult Env
 transDecl context evalEnv envStub (DValue (Ident name) expr) =
-  Right $ insert name (transExp innerContext evalEnv expr) envStub
+  Right $ Map.insert name (transExp innerContext evalEnv expr) envStub
   where
     innerContext = appendToContext context ("declaration of " ++ name)
 
@@ -66,7 +66,7 @@ transDecl _ _ envStub (DData _ variants) =
   foldM go envStub variants where
     go :: Env -> Variant -> PResult Env
     go env' (Var (Ident name) args) =
-      Right $ insert name (Right $ transConstructor name args []) env'
+      Right $ Map.insert name (Right $ transConstructor name args []) env'
 
 transDecl _ _ envStub (DType _ _) = Right envStub
 
@@ -122,11 +122,11 @@ transExp context env x = case x of
     transExp context env' expr
   EVar (Ident ident) ->
     fromMaybe (Left $ InterpreterError context (IdentifierUnset ident))
-              (M.lookup ident env)
+              (Map.lookup ident env)
   ELambda (Ident ident) expr ->
     Right (Func func) where
       func arg = transExp context env' expr where
-        env' = insert ident arg env
+        env' = Map.insert ident arg env
   EApp func arg -> do
     funcVal <- transExp context env func
     case funcVal of
@@ -152,7 +152,7 @@ transExp context env x = case x of
       matchPattern :: Env -> Value -> Pattern -> Maybe (PResult Env)
       matchPattern env' _ PAny = Just (Right env')
       matchPattern env' value (PValue (Ident str)) =
-        Just $ Right $ insert str (Right value) env'
+        Just $ Right $ Map.insert str (Right value) env'
       matchPattern env' value (PVariant (Ident exprectedName) patterns) =
         case value of
           Variant variantName variantData ->
@@ -175,7 +175,7 @@ transExp context env x = case x of
         (a:_) -> a
 
 specialBuiltins :: Env
-specialBuiltins = fromList
+specialBuiltins = Map.fromList
   [ ("+", arithmBuiltin (+))
   , ("-", arithmBuiltin (-))
   , ("*", arithmBuiltin (*))
