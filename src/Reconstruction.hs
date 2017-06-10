@@ -298,12 +298,9 @@ tiDecl env (DType (Ident name) typeRef) undefList =
     freeVars <- mapM (newTyVar . const ()) uniqVars
     let freeVarsMap = Map.fromList (zip uniqVars freeVars)
     t <- transTypeRef freeVarsMap typeRef
-    let env' = remove env name
-        s = generalize env t
-        env'' = TypeEnv { varsMap = Map.insert name s (varsMap env')
-                        , variantsMap = variantsMap env'
-                        }
-    return (nullSubst, env'', name:undefList)
+    let s = generalize env t
+    env' <- addScheme env (name, s)
+    return (nullSubst, env', name:undefList)
   where
     typeVariables :: TypeRef -> [String]
     typeVariables (TRVariant _ refs) =
