@@ -4,8 +4,8 @@ do
   echo $x ;
   cat $x ;
   echo "--";
-  ./interpreter -t $x || (echo error; exit 1);
-  ./interpreter -d $x || (echo error; exit 1);
+  ./interpreter -t $x || { echo error; exit 1; };
+  ./interpreter -d $x || { echo error; exit 1; };
   echo;
   echo;
 done;
