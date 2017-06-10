@@ -321,7 +321,7 @@ tiDecl env (DType (Ident name) typeRef) undefList =
     let uniqVars = nub dupVars
     freeVars <- mapM (newTyVar . const ()) uniqVars
     let freeVarsMap = Map.fromList (zip uniqVars freeVars)
-    t <- transTypeRef freeVarsMap typeRef
+    t <- transTypeRef env freeVarsMap typeRef
     let s = generalize env t
     env' <- addScheme env (name, s)
     return (nullSubst, env', name:undefList)
@@ -357,7 +357,7 @@ declVariant :: [Type] -> Map.Map String Type -> TypeEnv ->
 declVariant freeVars _ env typeName paramNames
             variant@(Var (Ident varName) _) =
     do
-        (baseType, paramTypes) <- buildConstType typeName paramNames variant freeVars
+        (baseType, paramTypes) <- buildConstType env typeName paramNames variant freeVars
         let t = foldl (flip TFun) baseType (reverse paramTypes)
         let t' = generalize env t
         env' <- addScheme env (varName, t')
@@ -367,29 +367,35 @@ declVariant freeVars _ env typeName paramNames
     typeFunc :: NewConstructor
     typeFunc _ = do
       newFreeVars <- mapM (const (newTyVar ())) freeVars
-      buildConstType typeName paramNames variant newFreeVars
+      buildConstType env typeName paramNames variant newFreeVars
 
-buildConstType :: String -> [String] -> Variant -> [Type] -> TI (Type, [Type])
-buildConstType typeName typeParams (Var (Ident _) typeRefs) freeVars =
+buildConstType :: TypeEnv -> String -> [String] -> Variant -> [Type] -> TI (Type, [Type])
+buildConstType env typeName typeParams (Var (Ident _) typeRefs) freeVars =
   let freeVarsMap = Map.fromList (zip typeParams freeVars) in do
-    paramTypes <- mapM (transTypeRef freeVarsMap) typeRefs
+    paramTypes <- mapM (transTypeRef env freeVarsMap) typeRefs
     return (TVariant typeName freeVars, paramTypes)
 
 
-transTypeRef :: Map.Map String Type -> TypeRef -> TI Type
-transTypeRef freeVarsMap (TRVariant (Ident ident) typeRefs)
+transTypeRef :: TypeEnv -> Map.Map String Type -> TypeRef -> TI Type
+transTypeRef env freeVarsMap (TRVariant (Ident ident) typeRefs)
   | ident == intVerboseName && not (null typeRefs) =
       throwError "type Integer does not take parameters"
   | ident == intVerboseName = return TInt
-  | otherwise = do
-      params <- mapM (transTypeRef freeVarsMap) typeRefs
-      return $ TVariant ident params -- todo: check existance and num of parameters
+  | otherwise =
+      case Map.lookup ident (typesMap env) of
+        Nothing -> throwError $ "reference to undefined type " ++ ident
+        Just a | a /= length typeRefs ->
+          throwError $ "expected " ++ show a ++ " parameters to " ++ ident ++
+              ", got " ++ show (length typeRefs)
+        Just _ -> do
+          params <- mapM (transTypeRef env freeVarsMap) typeRefs
+          return $ TVariant ident params -- todo: check existance and num of parameters
 
-transTypeRef freeVarsMap (TRValue (Ident ident)) = return $ freeVarsMap Map.! ident
-transTypeRef freeVarsMap (TRFunc typeRef1 typeRef2) =
+transTypeRef _ freeVarsMap (TRValue (Ident ident)) = return $ freeVarsMap Map.! ident
+transTypeRef env freeVarsMap (TRFunc typeRef1 typeRef2) =
   do
-    type1 <- transTypeRef freeVarsMap typeRef1
-    type2 <- transTypeRef freeVarsMap typeRef2
+    type1 <- transTypeRef env freeVarsMap typeRef1
+    type2 <- transTypeRef env freeVarsMap typeRef2
     return $ TFun type1 type2
 
 -- running the inference algorithm
@@ -418,7 +424,7 @@ testWithBuiltins builtinProgram program =
   where
         builtinEnv = TypeEnv { varsMap = builtins
                              , variantsMap = Map.empty
-                             , typesMap = Map.empty }
+                             , typesMap = Map.singleton intVerboseName 0 }
         builtins = Map.fromList
                     [ ("+", intIntInt)
                     , ("-", intIntInt)

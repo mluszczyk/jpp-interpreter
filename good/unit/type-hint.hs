@@ -1,2 +1,2 @@
-main :: Int ;
+main :: Integer ;
 main = 5
