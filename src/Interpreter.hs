@@ -48,28 +48,35 @@ transConstructor name [] results = Variant name results
 transConstructor name (_:rest) results =
   Func (\r -> Right $ transConstructor name rest (results ++ [r]))
 
+data Context = Context [String]
+
+appendToContext :: Context -> String -> Context
+appendToContext (Context items) str = Context (str:items)
+
 -- evalEnv is the fixed point of the environment, the expressions are
 -- evaluated in evalEnv. envStub is an accumulator for foldM and this value
 -- is updated and then returned.
-transDecl :: Env -> Env -> Decl -> PResult Env
-transDecl evalEnv envStub (DValue (Ident name) expr) =
-  Right $ insert name (transExp evalEnv expr) envStub
+transDecl :: Context -> Env -> Env -> Decl -> PResult Env
+transDecl context evalEnv envStub (DValue (Ident name) expr) =
+  Right $ insert name (transExp innerContext evalEnv expr) envStub
+  where
+    innerContext = appendToContext context ("declaration of " ++ name)
 
-transDecl _ envStub (DData _ variants) =
+transDecl _ _ envStub (DData _ variants) =
   foldM go envStub variants where
     go :: Env -> Variant -> PResult Env
     go env' (Var (Ident name) args) =
       Right $ insert name (Right $ transConstructor name args []) env'
 
-transDecl _ envStub (DType _ _) = Right envStub
+transDecl _ _ envStub (DType _ _) = Right envStub
 
-transDecls :: Env -> [Decl] -> PResult Env
-transDecls env decls = do
-    rec env' <- foldM (transDecl env') env decls
+transDecls :: Context -> Env -> [Decl] -> PResult Env
+transDecls context env decls = do
+    rec env' <- foldM (transDecl context env') env decls
     return env'
 
 
-data InterpreterError =
+data InterpreterErrorMessage =
     IdentifierUnset String
   | AppToConstant
   | IncorrectNumOfVariantParameters
@@ -78,7 +85,7 @@ data InterpreterError =
   | NonIntegerForArithmeticOperation
   | DivisionByZero
 
-errorMessage :: InterpreterError -> String
+errorMessage :: InterpreterErrorMessage -> String
 errorMessage (IdentifierUnset ident) =
   "identifier " ++ ident ++ " unset"
 errorMessage AppToConstant =
@@ -90,43 +97,54 @@ errorMessage CaseWithNonVariant =
 errorMessage ExhaustedPatternMatching =
   "exhausted pattern matching"
 errorMessage NonIntegerForArithmeticOperation =
-  "unsupported non-integer argument for arithmetic operation"
+  "unsupported non-integer argument"
 errorMessage DivisionByZero =
   "division by 0"
 
-instance Show InterpreterError where
-  show s = errorMessage s
+data InterpreterError = InterpreterError Context InterpreterErrorMessage
 
-transExp :: Env -> Exp -> Result
-transExp env x = case x of
+instance Show InterpreterError where
+  show (InterpreterError cont msg) = errorMessage msg ++
+      unlinesPrependNewline (contextToLines cont)
+
+unlinesPrependNewline :: [String] -> String
+unlinesPrependNewline items =
+  concat (Prelude.map ("\n" ++) items)
+
+contextToLines :: Context -> [String]
+contextToLines (Context items) = Prelude.map (" in " ++) items
+
+transExp :: Context -> Env -> Exp -> Result
+transExp context env x = case x of
   EInt integer -> Right $ Const integer
   ELet decls expr -> do
-    env' <- transDecls env decls
-    transExp env' expr
+    env' <- transDecls context env decls
+    transExp context env' expr
   EVar (Ident ident) ->
-    fromMaybe (Left $ IdentifierUnset ident) (M.lookup ident env)
+    fromMaybe (Left $ InterpreterError context (IdentifierUnset ident))
+              (M.lookup ident env)
   ELambda (Ident ident) expr ->
     Right (Func func) where
-      func arg = transExp env' expr where
+      func arg = transExp context env' expr where
         env' = insert ident arg env
   EApp func arg -> do
-    funcVal <- transExp env func
+    funcVal <- transExp context env func
     case funcVal of
       Func f -> do
-        let argRes = transExp env arg
+        let argRes = transExp context env arg
         f argRes
-      _ -> Left AppToConstant
+      _ -> Left $ InterpreterError context AppToConstant
   ECase expr caseParts ->
     let
       matchSubpatterns :: Env -> [Result] -> [Pattern] -> Maybe (PResult Env)
       matchSubpatterns env' results patterns =
         if length results /= length patterns
-          then Just $ Left IncorrectNumOfVariantParameters
+          then Just $ Left $ InterpreterError context IncorrectNumOfVariantParameters
           else Prelude.foldl go (Just $ Right env') (zip results patterns)
             where
               go :: Maybe (PResult Env) -> (Result, Pattern) -> Maybe (PResult Env)
               go Nothing _ = Nothing
-              go (Just (Left  s)) _ = Just $ Left s
+              go (Just (Left s)) _ = Just $ Left s
               go (Just (Right env'')) (result, pat) = case result of
                 Right value -> matchPattern env'' value pat
                 Left s -> Just (Left s)
@@ -141,19 +159,19 @@ transExp env x = case x of
             if variantName == exprectedName
               then matchSubpatterns env' variantData patterns
               else Nothing
-          _ -> Just $ Left CaseWithNonVariant
+          _ -> Just $ Left $ InterpreterError context CaseWithNonVariant
 
       matchCasePart :: Value -> CasePart -> Maybe Result
       matchCasePart value (CaseP pat thenExp) =
         case matchPattern env value pat of
-          Just (Right env') -> Just $ transExp env' thenExp
+          Just (Right env') -> Just $ transExp context env' thenExp
           Just (Left b) -> Just (Left b)
           Nothing -> Nothing
     in do
-      val <- transExp env expr
+      val <- transExp context env expr
       let matches = Data.Maybe.mapMaybe (matchCasePart val) caseParts
       case matches of
-        [] -> Left ExhaustedPatternMatching
+        [] -> Left $ InterpreterError context ExhaustedPatternMatching
         (a:_) -> a
 
 specialBuiltins :: Env
@@ -181,11 +199,14 @@ specialBuiltins = fromList
             checkIntFunc v1 v2
 
         checkIntFunc (Const i1) (Const i2) = func i1 i2
-        checkIntFunc _ _ = Left NonIntegerForArithmeticOperation
+        checkIntFunc _ _ = Left $
+          InterpreterError (Context ["builtin arithmetic operation"])
+          NonIntegerForArithmeticOperation
 
     division = binaryIntFuncWrapper foo
       where
-        foo _ i2 | i2 == 0 = Left DivisionByZero
+        foo _ i2 | i2 == 0 = Left $
+          InterpreterError (Context []) DivisionByZero
         foo i1 i2 = Right $ Const (i1 `div` i2)
 
     arithmBuiltin :: (Integer -> Integer -> Integer) -> Result
@@ -206,8 +227,8 @@ specialBuiltins = fromList
 interpretWithBuiltins :: Program -> Program -> PResult DisplayValue
 interpretWithBuiltins (Program builtinsDecls) (Program programDecls) =
     do
-      builtinEnv <- transDecls specialBuiltins builtinsDecls
-      res <- transExp builtinEnv expr
+      builtinEnv <- transDecls (Context ["builtins"]) specialBuiltins builtinsDecls
+      res <- transExp (Context []) builtinEnv expr
       resultToDisplay (Right res)
   where
     expr = ELet programDecls (EVar (Ident "main"))
