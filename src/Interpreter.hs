@@ -16,12 +16,12 @@ instance Show DisplayValue where
 
 prValue :: DisplayValue -> PP.Doc
 prValue (DisplayConst n) = PP.text (show n)
-prValue (DisplayFunc) = PP.text "function"
+prValue DisplayFunc = PP.text "function"
 prValue (DisplayVariant s d) =
   PP.text s PP.<+> PP.hsep (Prelude.map prParenValue d)
 
 prParenValue :: DisplayValue -> PP.Doc
-prParenValue t@(DisplayVariant _ d) | length d > 0 = PP.parens (prValue t)
+prParenValue t@(DisplayVariant _ d) | not (null d) = PP.parens (prValue t)
 prParenValue t = prValue t
 
 data DisplayValue = DisplayConst Integer
@@ -45,7 +45,7 @@ transConstructor name [] results = Variant name results
 transConstructor name (_:rest) results =
   Func (\r -> Right $ transConstructor name rest (results ++ [r]))
 
-data Context = Context [String]
+newtype Context = Context [String]
 
 appendToContext :: Context -> String -> Context
 appendToContext (Context items) str = Context (str:items)
@@ -105,8 +105,7 @@ instance Show InterpreterError where
       unlinesPrependNewline (contextToLines cont)
 
 unlinesPrependNewline :: [String] -> String
-unlinesPrependNewline items =
-  concat (Prelude.map ("\n" ++) items)
+unlinesPrependNewline = concatMap ("\n" ++) 
 
 contextToLines :: Context -> [String]
 contextToLines (Context items) = Prelude.map (" in " ++) items

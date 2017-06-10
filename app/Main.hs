@@ -53,7 +53,7 @@ run p interpreterFunc s = do
   let sTree = simplify tree
   either 
     (\x -> do printError x; exitFailure)
-    (\x -> putStrLn x)
+    putStrLn
     (interpreterFunc sBuiltinsTree sTree)
   exitSuccess
 
