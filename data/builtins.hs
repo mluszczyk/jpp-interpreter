@@ -61,5 +61,5 @@ zip :: (List a) -> (List b) -> (List (Pair a b) );
 zip a b = case (Pair a b) of {
   Pair Nil _ -> Nil;
   Pair _ Nil -> Nil;
-  Pair (Cons a ta) (Cons b tb) -> Cons (Pair a b) (zip ta tb);
+  Pair (Cons ha ta) (Cons hb tb) -> Cons (Pair ha hb) (zip ta tb);
 };

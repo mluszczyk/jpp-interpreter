@@ -1,6 +1,6 @@
 {-
 Algorithm W according to Martin Grabmuller paper, but heavily modified.
-Available as JPP course material.
+The original version is available as JPP course material.
 -}
 
 module Reconstruction where 
@@ -167,15 +167,10 @@ ti env (EVar (Ident ident)) =
 ti _ (EInt integer) = tiLit (LInt integer)
 
 ti env (ELambda (Ident n) e) =
-    do  tv <- newTyVar ()
-        let env' = remove env n
-            env'' = TypeEnv
-              { varsMap = varsMap env'
-                    `Map.union` Map.singleton n (Scheme [] tv)
-              , variantsMap = variantsMap env'
-              }
-        (s1, t1) <- ti env'' e
-        return (s1, TFun (apply s1 tv) t1)
+  do  tv <- newTyVar ()
+      env' <- addScheme env (n, (Scheme [] tv))
+      (s1, t1) <- ti env' e
+      return (s1, TFun (apply s1 tv) t1)
 
 ti env (EApp e1 e2) =
     do  tv <- newTyVar ()
@@ -199,11 +194,10 @@ ti env (ECase expr caseParts) = do
     go (s1, exprType, resultType) (CaseP patt result) = do
           (patternType, varMap, s2) <- casePartToType env patt s1
           s3 <- mgu patternType (apply (s2 `composeSubst` s1) exprType)
-          let envMapUpdate = Map.map (Scheme []) (Map.map (apply s3) varMap)
-          (s4, resultType') <- ti (apply (s3 `composeSubst` s2 `composeSubst` s1)
-              TypeEnv { varsMap = envMapUpdate `Map.union` varsMap env
-                      , variantsMap = variantsMap env
-                      }) result
+          let schemeUpdate = Map.map (Scheme []) (Map.map (apply s3) varMap)
+          localEnv <- foldM addScheme env (Map.toList schemeUpdate)
+          (s4, resultType') <- ti (apply (s3 `composeSubst` s2 `composeSubst` s1) localEnv)
+              result
           s5 <- mgu (apply (
             s4 `composeSubst` s3 `composeSubst` s2 `composeSubst` s1
             ) resultType) resultType'
@@ -215,6 +209,14 @@ ti env (ECase expr caseParts) = do
                  , apply (s5 `composeSubst` s4 `composeSubst`
                           s3 `composeSubst` s2 `composeSubst`
                           s1) resultType')
+
+addScheme :: TypeEnv -> (String, Scheme) -> TI TypeEnv
+addScheme env (name, scheme) =
+  if Map.member name (varsMap env) then
+    throwError $ "redefinition of " ++ name ++ " shadows an existing definition"
+  else return $
+    TypeEnv { varsMap = Map.insert name scheme (varsMap env)
+            , variantsMap = variantsMap env }
 
 casePartToType :: TypeEnv -> Pattern -> Subst -> 
                   TI (Type, Map.Map String Type, Subst)
