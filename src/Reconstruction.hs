@@ -75,13 +75,15 @@ composeSubst s1 s2   = Map.map (apply s1) s2 `Map.union` s1
    variantsMap for each variant type constructor stores a function that generates
    type of the constructor and types of the constructor parameters with respect
    to freshly generates type variables
+   typesMap stores defined types and the number of their parameters
 -}
-type NewConstructor = (() -> TI (Type, [Type]))
 data TypeEnv = TypeEnv
   { varsMap :: Map.Map String Scheme
   , variantsMap :: Map.Map String NewConstructor
   , typesMap :: Map.Map String Int
   }
+
+type NewConstructor = (TI (Type, [Type]))
 
 instance Types TypeEnv where
     ftv env      =  ftv (Map.elems (varsMap env))
@@ -107,15 +109,15 @@ runTI t =
   where initTIState = TIState{tiSupply = 0}
 
 -- create type variable
-newTyVar :: () -> TI Type
-newTyVar _ =
+newTyVar :: TI Type
+newTyVar =
     do  s <- get
         put s{tiSupply = tiSupply s + 1}
         return (TVar  ("a" ++ show (tiSupply s)))
 
 -- creates a type from a scheme with freshly generated type variables
 instantiate :: Scheme -> TI Type
-instantiate (Scheme vars t) = do  nvars <- mapM (\ _ -> newTyVar ()) vars
+instantiate (Scheme vars t) = do  nvars <- mapM (\ _ -> newTyVar) vars
                                   let s = Map.fromList (zip vars nvars)
                                   return $ apply s t
 
@@ -164,13 +166,13 @@ ti env (EVar (Ident ident)) =
 ti _ (EInt integer) = tiLit (LInt integer)
 
 ti env (ELambda (Ident n) e) =
-  do  tv <- newTyVar ()
+  do  tv <- newTyVar
       env' <- addScheme env (n, (Scheme [] tv))
       (s1, t1) <- ti env' e
       return (s1, TFun (apply s1 tv) t1)
 
 ti env (EApp e1 e2) =
-    do  tv <- newTyVar ()
+    do  tv <- newTyVar
         (s1, t1) <- ti env e1
         (s2, t2) <- ti (apply s1 env) e2
         s3 <- mgu (apply s2 t1) (TFun t2 tv)
@@ -183,7 +185,7 @@ ti env (ELet decls e) =
 
 ti env (ECase expr caseParts) = do
     (subst, exprType) <- ti env expr
-    resultType <- newTyVar ()
+    resultType <- newTyVar
     (s, _, t) <- foldM go (subst, exprType, resultType) caseParts
     return (s, t)
 
@@ -234,11 +236,11 @@ addRegisteredType env (RegisteredType name num) =
 casePartToType :: TypeEnv -> Pattern -> Subst ->
                   TI (Type, Map.Map String Type, Subst)
 casePartToType _ PAny _ = do
-  var <- newTyVar ()
+  var <- newTyVar
   return (var, Map.empty, nullSubst)
 
 casePartToType _ (PValue (Ident n)) _ = do
-  var <- newTyVar ()
+  var <- newTyVar
   return (var, Map.singleton n var, nullSubst)
 
 casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
@@ -270,7 +272,7 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
     getConstType =
       maybe
         (throwError $ "constructor " ++ ident ++ " undefined")
-        (\x -> x ())
+        id
         (Map.lookup ident (variantsMap env))
 
 data RegisteredType = RegisteredType String Int;
@@ -336,7 +338,7 @@ tiDecl env (DType (Ident name) typeRef) undefList =
   enhanceErrorStack ("declaration of type of " ++ name) $ do
     let dupVars = typeVariables typeRef
     let uniqVars = nub dupVars
-    freeVars <- mapM (newTyVar . const ()) uniqVars
+    freeVars <- mapM (const newTyVar) uniqVars
     let freeVarsMap = Map.fromList (zip uniqVars freeVars)
     t <- transTypeRef env freeVarsMap typeRef
     let s = generalize env t
@@ -354,7 +356,7 @@ tiDecl env (DType (Ident name) typeRef) undefList =
 tiDecl env (DData (TDecl (Ident name) args) variants) undefList =
   enhanceErrorStack ("declaration of type " ++ name) $
     do
-      freeVars <- mapM (newTyVar . const ()) args
+      freeVars <- mapM (const newTyVar) args
       let freeVarsMap = Map.fromList (zip argNames freeVars)
       (s, t) <- foldM (go freeVars freeVarsMap) (nullSubst, env) variants
       return (s, t, undefList)
@@ -382,8 +384,8 @@ declVariant freeVars _ env typeName paramNames
         return env''
   where
     typeFunc :: NewConstructor
-    typeFunc _ = do
-      newFreeVars <- mapM (const (newTyVar ())) freeVars
+    typeFunc = do
+      newFreeVars <- mapM (const newTyVar) freeVars
       buildConstType env typeName paramNames variant newFreeVars
 
 buildConstType :: TypeEnv -> String -> [String] -> Variant -> [Type] -> TI (Type, [Type])
