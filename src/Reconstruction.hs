@@ -6,7 +6,7 @@ The original version is available as JPP course material.
 module Reconstruction where 
 
 import Data.Maybe ( fromMaybe )
-import Data.List ( nub )
+import Data.List ( nub, delete )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -77,8 +77,8 @@ composeSubst s1 s2   = Map.map (apply s1) s2 `Map.union` s1
    to freshly generates type variables
 -}
 data TypeEnv = TypeEnv
-  { varsMap :: Map.Map String Scheme  
-  , variantsMap :: Map.Map String (() -> TI (Type, [Type])) 
+  { varsMap :: Map.Map String Scheme
+  , variantsMap :: Map.Map String (() -> TI (Type, [Type]))
   }
 
 -- remove variable from type env
@@ -105,7 +105,7 @@ newtype TIState = TIState { tiSupply :: Int }
 type TI a = ExceptT String (State TIState) a
 
 runTI :: TI a -> (Either String a, TIState)
-runTI t = 
+runTI t =
     runState (runExceptT t) initTIState
   where initTIState = TIState{tiSupply = 0}
 
@@ -138,10 +138,10 @@ mgu (TVariant typeName1 params1) (TVariant typeName2 params2)
             do subst' <- mgu param1 param2
                return (subst `composeSubst` subst')
       in foldM go nullSubst (zip params1 params2)
-        
+
   | otherwise = throwError $ "different variant types do not unfiy: " ++
                               typeName1 ++ " vs. " ++ show typeName2
-mgu t1 t2                    =  throwError $ "types do not unify: " ++ show t1 ++ 
+mgu t1 t2                    =  throwError $ "types do not unify: " ++ show t1 ++
                                 " vs. " ++ show t2
 
 -- bind variable and return substitution, don't bind to self
@@ -158,7 +158,7 @@ tiLit (LInt _)   =  return (nullSubst, TInt)
 
 -- infer type of exp
 ti        ::  TypeEnv -> Exp -> TI (Subst, Type)
-ti env (EVar (Ident ident)) = 
+ti env (EVar (Ident ident)) =
     case Map.lookup ident (varsMap env) of
        Nothing     ->  throwError $ "unbound variable: " ++ ident
        Just sigma  ->  do  t <- instantiate sigma
@@ -190,7 +190,7 @@ ti env (ECase expr caseParts) = do
     (s, _, t) <- foldM go (subst, exprType, resultType) caseParts
     return (s, t)
 
-  where 
+  where
     go (s1, exprType, resultType) (CaseP patt result) = do
           (patternType, varMap, s2) <- casePartToType env patt s1
           s3 <- mgu patternType (apply (s2 `composeSubst` s1) exprType)
@@ -262,29 +262,33 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
 
 
 tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
-tiDecls env =
-  foldM go (nullSubst, env)
+tiDecls env decls =
+  do (s, e, _) <- foldM go (nullSubst, env, []) decls
+     return (s, e)
     where
-      go :: (Subst, TypeEnv) -> Decl -> TI (Subst, TypeEnv)
-      go (s1, env') decl = do
-        (s2, env'') <- tiDecl env' decl
-        return (s1 `composeSubst` s2, env'')
+      go :: (Subst, TypeEnv, [String]) -> Decl -> TI (Subst, TypeEnv, [String])
+      go (s1, env', undef) decl = do
+        (s2, env'', undef') <- tiDecl env' decl undef
+        return (s1 `composeSubst` s2, env'', undef')
 
 -- type inference on a declaration
 -- returns modified type env and substitution that will be applied
 -- to the let expression containing the declaration if any
-tiDecl :: TypeEnv -> Decl -> TI (Subst, TypeEnv)
-tiDecl env (DValue (Ident x) e1) =
+-- [String] is a list of identifiers, for which a type was declared, but
+-- not are undefined
+tiDecl :: TypeEnv -> Decl -> [String] -> TI (Subst, TypeEnv, [String])
+tiDecl env (DValue (Ident x) e1) undefList =
   enhanceErrorStack ("delcaration of " ++ x) $
     do  (s1, t1) <- ti env e1
-        let env' = remove env x
-            t' = generalize (apply s1 env) t1
-            env'' = TypeEnv { varsMap = Map.insert x t' (varsMap env')
-                            , variantsMap = variantsMap env'
-                            }
-        return (s1, apply s1 env'')
+        let t' = generalize (apply s1 env) t1
+        if elem x undefList then  
+          -- todo: check if the type matches type declaration
+          return (s1, apply s1 env, delete x undefList)
+        else do
+          env' <- addScheme env (x, t')
+          return (s1, apply s1 env', undefList)
 
-tiDecl env (DType (Ident name) typeRef) =
+tiDecl env (DType (Ident name) typeRef) undefList =
   enhanceErrorStack ("declaration of type of " ++ name) $ do
     let dupVars = typeVariables typeRef
     let uniqVars = nub dupVars
@@ -296,7 +300,7 @@ tiDecl env (DType (Ident name) typeRef) =
         env'' = TypeEnv { varsMap = Map.insert name s (varsMap env')
                         , variantsMap = variantsMap env'
                         }
-    return (nullSubst, env'')
+    return (nullSubst, env'', name:undefList)
   where
     typeVariables :: TypeRef -> [String]
     typeVariables (TRVariant _ refs) =
@@ -306,12 +310,13 @@ tiDecl env (DType (Ident name) typeRef) =
       typeVariables ref1 ++ typeVariables ref2
 
 
-tiDecl env (DData (TDecl (Ident name) args) variants) =
+tiDecl env (DData (TDecl (Ident name) args) variants) undefList =
   enhanceErrorStack ("declaration of type " ++ name) $ 
     do
       freeVars <- mapM (newTyVar . const ()) args
       let freeVarsMap = Map.fromList (zip argNames freeVars)
-      foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
+      (s, t) <- foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
+      return (s, t, undefList)
   where
     argNames = map unIdent args
     go :: [Type] -> Map.Map String Type -> (Subst, TypeEnv) ->

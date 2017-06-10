@@ -1,7 +1,7 @@
 data Wrapper a = W a;
 
 unwrap a = case a of {
-  W a -> a
+  W bare -> bare
 } ;
 
 main = unwrap (W 5)
