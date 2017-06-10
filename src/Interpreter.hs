@@ -2,7 +2,6 @@
 
 module Interpreter where
 
-import Control.Monad
 import qualified Data.Map as Map
 import SimpleGrammar
 import Data.Maybe (fromMaybe, mapMaybe)
@@ -56,24 +55,24 @@ appendToContext (Context items) str = Context (str:items)
 -- evalEnv is the fixed point of the environment, the expressions are
 -- evaluated in evalEnv. envStub is an accumulator for foldM and this value
 -- is updated and then returned.
-transDecl :: Context -> Env -> Env -> Decl -> PResult Env
+transDecl :: Context -> Env -> Env -> Decl -> Env
 transDecl context evalEnv envStub (DValue (Ident name) expr) =
-  Right $ Map.insert name (transExp innerContext evalEnv expr) envStub
+  Map.insert name (transExp innerContext evalEnv expr) envStub
   where
     innerContext = appendToContext context ("declaration of " ++ name)
 
 transDecl _ _ envStub (DData _ variants) =
-  foldM go envStub variants where
-    go :: Env -> Variant -> PResult Env
+  foldl go envStub variants where
+    go :: Env -> Variant -> Env
     go env' (Var (Ident name) args) =
-      Right $ Map.insert name (Right $ transConstructor name args []) env'
+      Map.insert name (Right $ transConstructor name args []) env'
 
-transDecl _ _ envStub (DType _ _) = Right envStub
+transDecl _ _ envStub (DType _ _) = envStub
 
-transDecls :: Context -> Env -> [Decl] -> PResult Env
-transDecls context env decls = do
-    rec env' <- foldM (transDecl context env') env decls
-    return env'
+transDecls :: Context -> Env -> [Decl] -> Env
+transDecls context env decls = env'
+  where
+    env' = foldl (transDecl context env') env decls
 
 
 data InterpreterErrorMessage =
@@ -118,7 +117,7 @@ transExp :: Context -> Env -> Exp -> Result
 transExp context env x = case x of
   EInt integer -> Right $ Const integer
   ELet decls expr -> do
-    env' <- transDecls context env decls
+    let env' = transDecls context env decls
     transExp context env' expr
   EVar (Ident ident) ->
     fromMaybe (Left $ InterpreterError context (IdentifierUnset ident))
@@ -227,7 +226,7 @@ specialBuiltins = Map.fromList
 interpretWithBuiltins :: Program -> Program -> PResult DisplayValue
 interpretWithBuiltins (Program builtinsDecls) (Program programDecls) =
     do
-      builtinEnv <- transDecls (Context ["builtins"]) specialBuiltins builtinsDecls
+      let builtinEnv = transDecls (Context ["builtins"]) specialBuiltins builtinsDecls
       res <- transExp (Context []) builtinEnv expr
       resultToDisplay (Right res)
   where
