@@ -1,8 +1,5 @@
 -- example of case expression
 
-
-data List a = Cons (a) (List a) | Nil ;
-
 sum :: (List Integer) -> Integer ;
 sum t = case t of {
   Nil -> 0 ;

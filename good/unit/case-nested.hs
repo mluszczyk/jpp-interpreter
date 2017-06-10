@@ -1,5 +1,3 @@
-data List a = Cons a (List a) | Nil;
-
 main = case a of {
   Cons x (Cons y (Cons z t)) -> x ;
   _ -> 0

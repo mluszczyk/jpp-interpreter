@@ -76,16 +76,11 @@ composeSubst s1 s2   = Map.map (apply s1) s2 `Map.union` s1
    type of the constructor and types of the constructor parameters with respect
    to freshly generates type variables
 -}
+type NewConstructor = (() -> TI (Type, [Type]))
 data TypeEnv = TypeEnv
   { varsMap :: Map.Map String Scheme
-  , variantsMap :: Map.Map String (() -> TI (Type, [Type]))
+  , variantsMap :: Map.Map String NewConstructor
   }
-
--- remove variable from type env
-remove                    ::  TypeEnv -> String -> TypeEnv
-remove envStruct var  =
-      TypeEnv {varsMap = Map.delete var (varsMap envStruct)
-              , variantsMap = variantsMap envStruct}
 
 instance Types TypeEnv where
     ftv env      =  ftv (Map.elems (varsMap env))
@@ -218,6 +213,11 @@ addScheme env (name, scheme) =
     TypeEnv { varsMap = Map.insert name scheme (varsMap env)
             , variantsMap = variantsMap env }
 
+addVariant :: TypeEnv -> (String, NewConstructor) -> TypeEnv
+addVariant env (name, scheme) =
+  TypeEnv { varsMap = varsMap env,
+            variantsMap = Map.insert name scheme (variantsMap env) }
+
 casePartToType :: TypeEnv -> Pattern -> Subst ->
                   TI (Type, Map.Map String Type, Subst)
 casePartToType _ PAny _ = do
@@ -335,16 +335,12 @@ declVariant freeVars _ env typeName paramNames
     do
         (baseType, paramTypes) <- buildConstType typeName paramNames variant freeVars
         let t = foldl (flip TFun) baseType (reverse paramTypes)
-        let
-            env' = remove env varName
-            t' = generalize env t
-            env'' = TypeEnv { varsMap = Map.insert varName t' (varsMap env')
-                            , variantsMap =
-                              Map.insert varName typeFunc (variantsMap env')
-                            }
+        let t' = generalize env t
+        env' <- addScheme env (varName, t')
+        let env'' = addVariant env' (varName, typeFunc)
         return env''
   where
-    typeFunc :: () -> TI (Type, [Type])
+    typeFunc :: NewConstructor
     typeFunc _ = do
       newFreeVars <- mapM (const (newTyVar ())) freeVars
       buildConstType typeName paramNames variant newFreeVars
