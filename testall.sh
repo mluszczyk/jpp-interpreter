@@ -4,12 +4,11 @@ do
   echo $x ;
   cat $x ;
   echo "--";
-  ./interpreter -t $x;
-  ./interpreter -d $x;
+  ./interpreter -t $x || (echo error; exit 1);
+  ./interpreter -d $x || (echo error; exit 1);
   echo;
   echo;
 done;
-
 
 echo;
 echo;

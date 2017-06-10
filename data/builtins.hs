@@ -63,3 +63,11 @@ zip a b = case (Pair a b) of {
   Pair _ Nil -> Nil;
   Pair (Cons ha ta) (Cons hb tb) -> Cons (Pair ha hb) (zip ta tb);
 };
+
+data Maybe a = Nothing | Just a;
+
+maybe :: b -> (a -> b) -> (Maybe a) -> b;
+maybe nothingVal justFunc val = case val of {
+  Nothing -> nothingVal;
+  Just a -> justFunc a
+}
