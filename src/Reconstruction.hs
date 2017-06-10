@@ -5,11 +5,12 @@ The original version is available as JPP course material.
 
 module Reconstruction where
 
-import Data.Maybe ( fromMaybe, catMaybes )
+import Data.Maybe ( fromMaybe, mapMaybe )
 import Data.List ( nub, delete, intercalate )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import Control.Monad ( when )
 import Control.Monad.Except
 import Control.Monad.State
 
@@ -117,7 +118,7 @@ newTyVar =
 
 -- creates a type from a scheme with freshly generated type variables
 instantiate :: Scheme -> TI Type
-instantiate (Scheme vars t) = do  nvars <- mapM (\ _ -> newTyVar) vars
+instantiate (Scheme vars t) = do  nvars <- mapM (const newTyVar) vars
                                   let s = Map.fromList (zip vars nvars)
                                   return $ apply s t
 
@@ -167,7 +168,7 @@ ti _ (EInt integer) = tiLit (LInt integer)
 
 ti env (ELambda (Ident n) e) =
   do  tv <- newTyVar
-      env' <- addScheme env (n, (Scheme [] tv))
+      env' <- addScheme env (n, Scheme [] tv)
       (s1, t1) <- ti env' e
       return (s1, TFun (apply s1 tv) t1)
 
@@ -213,7 +214,7 @@ addScheme :: TypeEnv -> (String, Scheme) -> TI TypeEnv
 addScheme env (name, scheme) =
   if Map.member name (varsMap env) then
     throwError $ "redefinition of " ++ name ++ " shadows an existing definition"
-  else return $
+  else return
     TypeEnv { varsMap = Map.insert name scheme (varsMap env)
             , variantsMap = variantsMap env
             , typesMap = typesMap env }
@@ -228,7 +229,7 @@ addRegisteredType :: TypeEnv -> RegisteredType -> TI TypeEnv
 addRegisteredType env (RegisteredType name num) =
   if Map.member name (typesMap env) then
     throwError $ "redefinition of type " ++ name
-  else return $
+  else return
     TypeEnv { varsMap = varsMap env
             , variantsMap = variantsMap env
             , typesMap = Map.insert name num (typesMap env) }
@@ -270,16 +271,15 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
 
     getConstType :: TI (Type, [Type])
     getConstType =
-      maybe
+      fromMaybe
         (throwError $ "constructor " ++ ident ++ " undefined")
-        id
         (Map.lookup ident (variantsMap env))
 
 data RegisteredType = RegisteredType String Int;
 
 -- returns all defined types, does not check duplicates
 findTypes :: [Decl] -> [RegisteredType]
-findTypes decls = do catMaybes (map extract decls)
+findTypes = mapMaybe extract
   where
     extract (DData (TDecl (Ident name) args) _) =
       Just $ RegisteredType name (length args)
@@ -306,9 +306,8 @@ checkGeneralizes s1 s2 = do
   t2 <- instantiate s2
   s <- mgu t1 t2
   let freeVars = ftv t2
-  if any (isGeneralized s) (Set.toList freeVars) then
-    throwError $ "definition less general than previous type declaration"
-  else return ()
+  when (any (isGeneralized s) (Set.toList freeVars)) $
+    throwError "definition less general than previous type declaration"
   where
     isGeneralized :: Subst -> String -> Bool
     isGeneralized subst str =
@@ -327,8 +326,8 @@ tiDecl env (DValue (Ident x) e1) undefList =
   enhanceErrorStack ("delcaration of " ++ x) $
     do  (s1, t1) <- ti env e1
         let t' = generalize (apply s1 env) t1
-        if elem x undefList then
-          do checkGeneralizes t' ((varsMap env) Map.! x)
+        if x `elem` undefList then
+          do checkGeneralizes t' (varsMap env Map.! x)
              -- we can Map.!, because it is on undefList, so it is also in the map
              return (s1, apply s1 env, delete x undefList)
         else do
@@ -436,8 +435,7 @@ typeInference env1 (Program builtinDecls) (Program decls) =
 
 enhanceErrorStack :: String -> TI a -> TI a
 enhanceErrorStack item errorExpr =
-  do
-    errorExpr
+  errorExpr
   `catchError`
   \e -> throwError $ e ++ "\n in " ++ item
 
