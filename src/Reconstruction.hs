@@ -329,6 +329,7 @@ tiDecl env (DValue (Ident x) e1) undefList =
         let t' = generalize (apply s1 env) t1
         if elem x undefList then
           do checkGeneralizes t' ((varsMap env) Map.! x)
+             -- we can Map.!, because it is on undefList, so it is also in the map
              return (s1, apply s1 env, delete x undefList)
         else do
           env' <- addScheme env (x, t')
