@@ -5,7 +5,7 @@ The original version is available as JPP course material.
 
 module Reconstruction where
 
-import Data.Maybe ( fromMaybe )
+import Data.Maybe ( fromMaybe, catMaybes )
 import Data.List ( nub, delete, intercalate )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -80,12 +80,14 @@ type NewConstructor = (() -> TI (Type, [Type]))
 data TypeEnv = TypeEnv
   { varsMap :: Map.Map String Scheme
   , variantsMap :: Map.Map String NewConstructor
+  , typesMap :: Map.Map String Int
   }
 
 instance Types TypeEnv where
     ftv env      =  ftv (Map.elems (varsMap env))
     apply s env  =  TypeEnv { varsMap = Map.map (apply s) (varsMap env)
-                            , variantsMap = variantsMap env }
+                            , variantsMap = variantsMap env
+                            , typesMap = typesMap env}
 
 -- converts a type to a scheme by fetching all variables not bound by env
 generalize        ::  TypeEnv -> Type -> Scheme
@@ -211,12 +213,23 @@ addScheme env (name, scheme) =
     throwError $ "redefinition of " ++ name ++ " shadows an existing definition"
   else return $
     TypeEnv { varsMap = Map.insert name scheme (varsMap env)
-            , variantsMap = variantsMap env }
+            , variantsMap = variantsMap env
+            , typesMap = typesMap env }
 
 addVariant :: TypeEnv -> (String, NewConstructor) -> TypeEnv
 addVariant env (name, scheme) =
-  TypeEnv { varsMap = varsMap env,
-            variantsMap = Map.insert name scheme (variantsMap env) }
+  TypeEnv { varsMap = varsMap env
+          , variantsMap = Map.insert name scheme (variantsMap env)
+          , typesMap = typesMap env }
+
+addRegisteredType :: TypeEnv -> RegisteredType -> TI TypeEnv
+addRegisteredType env (RegisteredType name num) =
+  if Map.member name (typesMap env) then
+    throwError $ "redefinition of type " ++ name
+  else return $
+    TypeEnv { varsMap = varsMap env
+            , variantsMap = variantsMap env
+            , typesMap = Map.insert name num (typesMap env) }
 
 casePartToType :: TypeEnv -> Pattern -> Subst ->
                   TI (Type, Map.Map String Type, Subst)
@@ -260,10 +273,21 @@ casePartToType env (PVariant (Ident ident) paramPatterns) subst1 = do
         (\x -> x ())
         (Map.lookup ident (variantsMap env))
 
+data RegisteredType = RegisteredType String Int;
+
+-- returns all defined types, does not check duplicates
+findTypes :: [Decl] -> [RegisteredType]
+findTypes decls = do catMaybes (map extract decls)
+  where
+    extract (DData (TDecl (Ident name) args) _) =
+      Just $ RegisteredType name (length args)
+    extract _ = Nothing
 
 tiDecls :: TypeEnv -> [Decl] -> TI (Subst, TypeEnv)
 tiDecls env decls =
-  do (s, e, undefList) <- foldM go (nullSubst, env, []) decls
+  do let types = findTypes decls
+     env' <- foldM addRegisteredType env types
+     (s, e, undefList) <- foldM go (nullSubst, env', []) decls
      if not (null undefList) then
        throwError $ "declared type, but undefined " ++ intercalate ", " undefList
      else
@@ -392,7 +416,9 @@ testWithBuiltins :: Program -> Program -> Either String Type
 testWithBuiltins builtinProgram program =
     fst (runTI (typeInference builtinEnv builtinProgram program))
   where
-        builtinEnv = TypeEnv {varsMap = builtins, variantsMap = Map.empty}
+        builtinEnv = TypeEnv { varsMap = builtins
+                             , variantsMap = Map.empty
+                             , typesMap = Map.empty }
         builtins = Map.fromList
                     [ ("+", intIntInt)
                     , ("-", intIntInt)
