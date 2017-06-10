@@ -410,7 +410,11 @@ transTypeRef env freeVarsMap (TRVariant (Ident ident) typeRefs)
           params <- mapM (transTypeRef env freeVarsMap) typeRefs
           return $ TVariant ident params
 
-transTypeRef _ freeVarsMap (TRValue (Ident ident)) = return $ freeVarsMap Map.! ident
+transTypeRef _ freeVarsMap (TRValue (Ident ident)) =
+  case Map.lookup ident freeVarsMap of
+    Nothing -> throwError $ "used undefined type variable " ++ show ident
+    Just var -> return var
+
 transTypeRef env freeVarsMap (TRFunc typeRef1 typeRef2) =
   do
     type1 <- transTypeRef env freeVarsMap typeRef1
