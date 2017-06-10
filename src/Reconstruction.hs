@@ -389,7 +389,7 @@ transTypeRef env freeVarsMap (TRVariant (Ident ident) typeRefs)
               ", got " ++ show (length typeRefs)
         Just _ -> do
           params <- mapM (transTypeRef env freeVarsMap) typeRefs
-          return $ TVariant ident params -- todo: check existance and num of parameters
+          return $ TVariant ident params
 
 transTypeRef _ freeVarsMap (TRValue (Ident ident)) = return $ freeVarsMap Map.! ident
 transTypeRef env freeVarsMap (TRFunc typeRef1 typeRef2) =
