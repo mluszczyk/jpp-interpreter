@@ -20,15 +20,19 @@ Similarities to Haskell:
   but not in function declarations),
 - recursive inc. mutually recursive functions, data types and values 
   (infinite lists as in Haskell),
-- language constructs like `let`, `where`, anonymous functions (one parameter only),
-  named functions (support multiple parameters,
+- language constructs like `let`, `where`, anonymous functions
+  (one parameter only), named functions (support multiple parameters,
   but no pattern matching in declarations),
-- case of the first letter in the identifier is distinguished.
+- case of the first letter in the identifier is distinguished,
+- the builtin library contains many prelude functions defined in the
+  interpreter language (see `data/builtin.hs`). Arithmetic types are also
+  built in, but they are mapped to Haskell functions.
 
 Distinct features:
 - IO () and String are not supported, so main is just meant to be any expression. 
   It will be evaluated and the value will be printed.
 - Recursive functions must be type hinted using `f :: Type` syntax.
+- No syntax sugar for list, use `Cons` and `Nil`.
 
 The BNFC compatible grammar is available in `src/grammar.cf`.
 
@@ -36,6 +40,13 @@ Examples can be found in the following directories:
 - `good/unit` - simple examples, usually for a single feature of the interpreter,
 - `good/complex` - examples using multiple features,
 - `bad` - examples of code that doesn't work.
+
+There is similar error reporting in the type checker and during
+the execution of the script. On the first line, the error is printed, on the
+following lines, the context is explained (e.g. in what function,
+what type declaration). The static context is always shown. In other words,
+for a nested function, the name of the surrounding function will be shown,
+but not the stack trace.
 
 Using the interpreter
 ---------------------
