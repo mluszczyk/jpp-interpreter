@@ -298,6 +298,23 @@ tiDecls env decls =
       (s2, env'', undef') <- tiDecl env' decl undef
       return (s1 `composeSubst` s2, env'', undef')
 
+checkGeneralizes :: Scheme -> Scheme -> TI ()
+checkGeneralizes s1 s2 = do
+  t1 <- instantiate s1
+  t2 <- instantiate s2
+  s <- mgu t1 t2
+  let freeVars = ftv t2
+  if any (isGeneralized s) (Set.toList freeVars) then
+    throwError $ "definition less general than previous type declaration"
+  else return ()
+  where
+    isGeneralized :: Subst -> String -> Bool
+    isGeneralized subst str =
+      case Map.lookup str subst of
+        Nothing -> False
+        Just (TVar _) -> False
+        Just _ -> True
+
 -- type inference on a declaration
 -- returns modified type env and substitution that will be applied
 -- to the let expression containing the declaration if any
@@ -309,8 +326,8 @@ tiDecl env (DValue (Ident x) e1) undefList =
     do  (s1, t1) <- ti env e1
         let t' = generalize (apply s1 env) t1
         if elem x undefList then
-          -- todo: check if the type matches type declaration
-          return (s1, apply s1 env, delete x undefList)
+          do checkGeneralizes t' ((varsMap env) Map.! x)
+             return (s1, apply s1 env, delete x undefList)
         else do
           env' <- addScheme env (x, t')
           return (s1, apply s1 env', undefList)
