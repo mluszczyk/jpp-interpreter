@@ -4,7 +4,6 @@ set +x
 cd src
 stack exec bnfc grammar.cf
 cd ../
-git checkout src/ErrM.hs
 rm src/*.bak
 rm src/TestGrammar.hs
 rm src/SkelGrammar.hs

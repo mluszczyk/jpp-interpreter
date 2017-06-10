@@ -176,14 +176,13 @@ ti env (ELambda (Ident n) e) =
               }
         (s1, t1) <- ti env'' e
         return (s1, TFun (apply s1 tv) t1)
-ti env expr@(EApp e1 e2) =
+
+ti env (EApp e1 e2) =
     do  tv <- newTyVar ()
         (s1, t1) <- ti env e1
         (s2, t2) <- ti (apply s1 env) e2
         s3 <- mgu (apply s2 t1) (TFun t2 tv)
         return (s3 `composeSubst` s2 `composeSubst` s1, apply s3 tv)
-    `catchError`
-    \e -> throwError $ e ++ "\n in " ++ show expr
 
 ti env (ELet decls e) =
     do  (s1, env1) <- tiDecls env decls
@@ -274,6 +273,7 @@ tiDecls env =
 -- to the let expression containing the declaration if any
 tiDecl :: TypeEnv -> Decl -> TI (Subst, TypeEnv)
 tiDecl env (DValue (Ident x) e1) =
+  enhanceErrorStack ("delcaration of " ++ x) $
     do  (s1, t1) <- ti env e1
         let env' = remove env x
             t' = generalize (apply s1 env) t1
@@ -282,19 +282,19 @@ tiDecl env (DValue (Ident x) e1) =
                             }
         return (s1, apply s1 env'')
 
-
-tiDecl env (DType (Ident name) typeRef) = do
-  let dupVars = typeVariables typeRef
-  let uniqVars = nub dupVars
-  freeVars <- mapM (newTyVar . const ()) uniqVars
-  let freeVarsMap = Map.fromList (zip uniqVars freeVars)
-  t <- transTypeRef freeVarsMap typeRef
-  let env' = remove env name
-      s = generalize env t
-      env'' = TypeEnv { varsMap = Map.insert name s (varsMap env')
-                      , variantsMap = variantsMap env'
-                      }
-  return (nullSubst, env'')
+tiDecl env (DType (Ident name) typeRef) =
+  enhanceErrorStack ("declaration of type of " ++ name) $ do
+    let dupVars = typeVariables typeRef
+    let uniqVars = nub dupVars
+    freeVars <- mapM (newTyVar . const ()) uniqVars
+    let freeVarsMap = Map.fromList (zip uniqVars freeVars)
+    t <- transTypeRef freeVarsMap typeRef
+    let env' = remove env name
+        s = generalize env t
+        env'' = TypeEnv { varsMap = Map.insert name s (varsMap env')
+                        , variantsMap = variantsMap env'
+                        }
+    return (nullSubst, env'')
   where
     typeVariables :: TypeRef -> [String]
     typeVariables (TRVariant _ refs) =
@@ -305,10 +305,11 @@ tiDecl env (DType (Ident name) typeRef) = do
 
 
 tiDecl env (DData (TDecl (Ident name) args) variants) =
-  do
-    freeVars <- mapM (newTyVar . const ()) args
-    let freeVarsMap = Map.fromList (zip argNames freeVars)
-    foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
+  enhanceErrorStack ("declaration of type " ++ name) $ 
+    do
+      freeVars <- mapM (newTyVar . const ()) args
+      let freeVarsMap = Map.fromList (zip argNames freeVars)
+      foldM (go freeVars freeVarsMap) (nullSubst, env) variants 
   where
     argNames = map unIdent args
     go :: [Type] -> Map.Map String Type -> (Subst, TypeEnv) ->
@@ -368,13 +369,20 @@ transTypeRef freeVarsMap (TRFunc typeRef1 typeRef2) =
 typeInference :: TypeEnv -> Program -> Program -> TI Type
 typeInference env1 (Program builtinDecls) (Program decls) =
   do 
-    (s1, env2) <- tiDecls env1 builtinDecls
+    (s1, env2) <- enhanceErrorStack "builtins" (tiDecls env1 builtinDecls)
     let env3 = apply s1 env2
     (s2, t) <- ti env3 e
     return (apply (s2 `composeSubst` s1) t)
 
   where
     e = ELet decls (EVar (Ident "main"))
+
+enhanceErrorStack :: String -> TI a -> TI a
+enhanceErrorStack item errorExpr =
+  do
+    errorExpr
+  `catchError`
+  \e -> throwError $ e ++ "\n in " ++ item
 
 
 testWithBuiltins :: Program -> Program -> Either String Type

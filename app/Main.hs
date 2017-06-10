@@ -94,6 +94,6 @@ main = do
     dynInterpret :: SG.Program -> SG.Program -> Either String String
     dynInterpret builtinsTree tree =
       case interpretWithBuiltins builtinsTree tree of
-        Bad s -> Left s
-        Ok s -> Right $ show s
+        Left s -> Left $ show s
+        Right s -> Right $ show s
 

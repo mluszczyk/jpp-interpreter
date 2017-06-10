@@ -63,4 +63,3 @@ zip a b = case (Pair a b) of {
   Pair _ Nil -> Nil;
   Pair (Cons a ta) (Cons b tb) -> Cons (Pair a b) (zip ta tb);
 };
-
