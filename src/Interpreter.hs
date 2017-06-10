@@ -1,5 +1,3 @@
-{-# LANGUAGE RecursiveDo #-}
-
 module Interpreter where
 
 import qualified Data.Map as Map
